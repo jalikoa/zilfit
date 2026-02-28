@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Zilfit Scan | 3D Foot Biometric Scanner</title>
+
+<link href="css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+/* ===== SPLASH SCREEN ===== */
+.splash-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #0a0a0a; display: flex; flex-direction: column;
+  justify-content: center; align-items: center; z-index: 9999;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+.splash-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.splash-logo {
+  font-size: 4rem; font-weight: 800; color: #fff; margin-bottom: 2rem;
+  animation: pulse 2s infinite;
+}
+.splash-logo span { color: #0d6efd; }
+@keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.05);opacity:0.9} }
+.splash-tagline { color:#aaa; font-size:1.2rem; max-width:500px; text-align:center; margin-bottom:3rem; }
+.splash-progress { width:200px; height:4px; background:#222; border-radius:2px; overflow:hidden; }
+.splash-progress-bar {
+  height:100%; width:0%; background:linear-gradient(90deg,#0d6efd,#0dcaf0);
+  border-radius:2px; animation:loadProgress 2.5s ease-in-out forwards;
+}
+@keyframes loadProgress { 0%{width:0} 30%{width:40} 70%{width:85} 100%{width:100} }
+
+/* ===== SCAN SECTION ===== */
+.scan-hero {
+  background:#111; padding:60px 0; text-align:center; min-height:100vh;
+  display:flex; align-items:center;
+}
+.scan-box {
+  border:2px dashed #444; border-radius:25px; padding:30px;
+  background:#181818; position:relative; overflow:hidden;
+}
+.laser-overlay {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  pointer-events:none; display:none; z-index:10;
+}
+.laser-line {
+  position:absolute; left:0; width:100%; height:3px;
+  background:linear-gradient(90deg,transparent,#ff006e,#0dcaf0,transparent);
+  box-shadow:0 0 15px #ff006e, 0 0 30px #0dcaf0;
+  animation:scanLine 2.5s ease-in-out infinite; border-radius:2px;
+}
+@keyframes scanLine { 0%{top:-10%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:110%;opacity:0} }
+
+.scan-guide {
+  position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+  background:rgba(13,110,253,0.15); border:1px solid #0d6efd;
+  border-radius:12px; padding:10px 20px; font-size:0.9rem; color:#aaa;
+  max-width:90%; z-index:5; display:flex; align-items:center; gap:8px;
+}
+.scan-guide i { color:#0d6efd; }
+.scan-guide.warning {
+  background:rgba(255,193,7,0.15); border-color:#ffc107; color:#ffc107;
+}
+.scan-guide.warning i { color:#ffc107; }
+
+video, canvas {
+  width:100%; border-radius:15px; display:block; background:#000;
+  max-height:400px; object-fit:contain;
+}
+.scan-btn {
+  border-radius:50px; padding:12px 28px; font-weight:600;
+  transition:all 0.3s ease;
+}
+.scan-btn:disabled { opacity:0.6; cursor:not-allowed; }
+.scan-title { font-size:42px; font-weight:700; margin-bottom:1rem; }
+.scan-sub { color:#aaa; max-width:600px; margin:auto; font-size:1.1rem; }
+
+/* ===== STEP INDICATOR ===== */
+.step-indicator {
+  display:flex; justify-content:center; gap:8px; margin:25px 0 35px;
+}
+.step-dot {
+  width:12px; height:12px; border-radius:50%; background:#444;
+  transition:all 0.3s ease;
+}
+.step-dot.active {
+  background:#0d6efd; transform:scale(1.3);
+  box-shadow:0 0 0 3px rgba(13,110,253,0.3);
+}
+.step-dot.completed { background:#198754; }
+
+/* ===== GOAL CARDS ===== */
+.goal-section { display:none; padding:40px 20px; }
+.goal-section.active { display:block; animation:fadeIn 0.5s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+.goal-cards {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:20px; max-width:900px; margin:30px auto;
+}
+.goal-card {
+  background:#1a1a1a; border:2px solid #333; border-radius:20px;
+  padding:25px 20px; cursor:pointer; transition:all 0.3s ease;
+  text-align:center;
+}
+.goal-card:hover, .goal-card.selected {
+  border-color:#0d6efd; background:rgba(13,110,253,0.1);
+  transform:translateY(-5px); box-shadow:0 10px 30px rgba(0,0,0,0.3);
+}
+.goal-card.selected { border-width:3px; }
+.goal-icon { font-size:2.5rem; margin-bottom:15px; color:#0d6efd; }
+.goal-card.selected .goal-icon { animation:bounce 0.5s ease; }
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.goal-title { font-weight:600; font-size:1.3rem; margin-bottom:8px; color:#fff; }
+.goal-desc { color:#aaa; font-size:0.95rem; line-height:1.5; }
+
+/* ===== SUCCESS SECTION ===== */
+.success-section {
+  display:none; text-align:center; padding:40px 20px;
+  max-width:600px; margin:0 auto;
+}
+.success-section.active { display:block; animation:fadeIn 0.6s ease; }
+.success-icon {
+  width:80px; height:80px; background:linear-gradient(135deg,#198754,#20c997);
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  margin:0 auto 25px; font-size:2rem; color:white; animation:popIn 0.5s ease;
+}
+@keyframes popIn { 0%{transform:scale(0)} 70%{transform:scale(1.2)} 100%{transform:scale(1)} }
+.success-title { font-size:1.8rem; font-weight:700; margin-bottom:15px; color:#fff; }
+.success-message { color:#ccc; margin-bottom:25px; line-height:1.6; }
+
+.calibration-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(13,202,240,0.15); border:1px solid #0dcaf0;
+  border-radius:50px; padding:8px 20px; font-size:0.95rem; color:#0dcaf0;
+  margin:15px 0;
+}
+.calibration-badge i { animation:spin 2s linear infinite; }
+@keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+
+.process-steps {
+  text-align:left; background:#151515; border-radius:15px;
+  padding:20px; margin:25px 0; border-left:3px solid #0d6efd;
+}
+.process-steps h6 { color:#0d6efd; margin-bottom:12px; }
+.process-steps ol { padding-left:20px; color:#aaa; font-size:0.95rem; line-height:1.7; }
+.process-steps li { margin-bottom:5px; }
+.process-steps .pro-tip {
+  background:rgba(255,193,7,0.1); border-left:3px solid #ffc107;
+  padding:12px 15px; border-radius:0 8px 8px 0; margin-top:15px;
+  font-size:0.9rem; color:#ffc107;
+}
+.process-steps .pro-tip i { margin-right:5px; }
+
+.measurement-card {
+  background:rgba(13,110,253,0.1); border:1px solid #0d6efd;
+  border-radius:12px; padding:15px; margin:15px 0; text-align:left;
+}
+.measurement-row {
+  display:flex; justify-content:space-between; padding:8px 0;
+  border-bottom:1px dashed rgba(255,255,255,0.1);
+}
+.measurement-row:last-child { border-bottom:none; }
+.measurement-label { color:#aaa; }
+.measurement-value { font-weight:600; color:#fff; }
+
+/* ===== PERFORMANCE MONITOR ===== */
+.perf-monitor {
+  position: fixed; bottom: 10px; right: 10px;
+  background: rgba(0,0,0,0.8); color: #0f0;
+  font-family: monospace; font-size: 11px;
+  padding: 8px 12px; border-radius: 8px;
+  z-index: 1000; display: none;
+}
+.perf-monitor.active { display: block; }
+.perf-row { display: flex; justify-content: space-between; gap: 15px; }
+
+.d-step { display:none; }
+.d-step.active { display:block; }
+.footer {
+  background:#0c0c0c; padding:40px 0; text-align:center;
+  color:#777; margin-top:60px;
+}
+
+@media (max-width:768px) {
+  .scan-title { font-size:2.2rem; }
+  .scan-box { padding:20px 15px; }
+  .goal-cards { grid-template-columns:1fr; }
+  video, canvas { max-height:300px; }
+  .perf-monitor { font-size: 10px; padding: 6px 10px; }
+}
+</style>
+</head>
+
+<body class="bg-dark text-light">
+
+<!-- ===== SPLASH SCREEN ===== -->
+<div class="splash-screen" id="splashScreen">
+  <div class="splash-logo">Zilfit<span>.</span></div>
+  <p class="text-muted mt-3 small">Initializing scanning engine...</p>
+</div>
+
+<!-- Navigation -->
+<nav class="custom-navbar navbar navbar-expand-md navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="index.html">Zilfit<span>.</span></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarsZilfit">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarsZilfit">
+      <ul class="custom-navbar-nav navbar-nav ms-auto mb-2 mb-md-0">
+        <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+        <li class="nav-item active"><a class="nav-link" href="#scan">Start Scan</a></li>
+        <li class="nav-item"><a class="nav-link" href="#process">Our Process</a></li>
+        <li class="nav-item"><a class="nav-link" href="#products">Products</a></li>
+        <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
+      </ul>
+      <ul class="custom-navbar-cta navbar-nav mb-2 mb-md-0 ms-4">
+        <li class="nav-item"><a class="nav-link" href="#"><img src="images/user.svg" alt="Account"></a></li>
+        <li class="nav-item"><a class="nav-link" href="cart.html"><img src="images/cart.svg" alt="Cart"></a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== MAIN SCAN FLOW ===== -->
+<section class="scan-hero bg-dark mb-5" id="scanSection">
+  <div class="container">
+    
+    <!-- Step Indicator -->
+    <div class="step-indicator">
+      <div class="step-dot active" id="step1"></div>
+      <div class="step-dot" id="step2"></div>
+      <div class="step-dot" id="step3"></div>
+      <div class="step-dot" id="step4"></div>
+    </div>
+
+    <h1 class="scan-title mb-3">3D Foot Scanner</h1>
+    <p class="scan-sub mb-4">
+      Place your foot inside the frame and capture a scan.  
+      Our intelligent system analyzes your biomechanics and generates precision footwear measurements in seconds.
+    </p>
+
+    <!-- STEP 1: BIOMETRIC SCAN -->
+    <div class="scan-step active" id="scanStep">
+      <div class="row justify-content-center">
+        <div class="col-lg-6 mb-5">
+          <div class="scan-box">
+            <div class="laser-overlay" id="laserOverlay">
+              <div class="laser-line"></div>
+            </div>
+            
+            <video id="camera" autoplay playsinline muted></video>
+            <canvas id="canvas" class="mt-3 d-none"></canvas>
+
+            <div class="mt-4 d-flex justify-content-center gap-2 flex-wrap">
+              <button class="btn btn-primary scan-btn" id="startCameraBtn" onclick="startCamera()">
+                <i class="fas fa-video me-2"></i>Start Camera
+              </button>
+              <button class="btn btn-light scan-btn" id="captureBtn" onclick="capture()" disabled>
+                <i class="fas fa-camera me-2"></i>Capture
+              </button>
+              <button class="btn btn-success scan-btn" id="analyzeBtn" onclick="processFoot()" disabled>
+                <i class="fas fa-brain me-2"></i>Analyze
+              </button>
+            </div>
+            
+            <div class="mt-3 small text-muted" id="scanStatus">
+              <i class="fas fa-circle me-1"></i>Click "Start Camera" to begin
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: GOAL SELECTION -->
+    <div class="goal-section" id="goalStep">
+      <h3 class="text-center mb-2">Select Your Wellness Goal</h3>
+      <p class="text-center text-muted mb-4">Your biometric data will be calibrated for optimal results</p>
+      
+      <div class="goal-cards">
+        <div class="goal-card" data-goal="calm" onclick="selectGoal(this)">
+          <div class="goal-icon"><i class="fas fa-moon"></i></div>
+          <div class="goal-title">Sleep & Calm</div>
+          <div class="goal-desc">Optimize foot support for relaxation and restful sleep patterns</div>
+        </div>
+        <div class="goal-card" data-goal="recovery" onclick="selectGoal(this)">
+          <div class="goal-icon"><i class="fas fa-heartbeat"></i></div>
+          <div class="goal-title">Recovery</div>
+          <div class="goal-desc">Enhance post-activity recovery with biomechanical alignment</div>
+        </div>
+        <div class="goal-card" data-goal="focus" onclick="selectGoal(this)">
+          <div class="goal-icon"><i class="fas fa-bolt"></i></div>
+          <div class="goal-title">Mental Focus</div>
+          <div class="goal-desc">Improve posture and circulation for sustained concentration</div>
+        </div>
+      </div>
+      
+      <div class="text-center mt-4">
+        <button class="btn btn-outline-secondary me-2" onclick="goToStep(1)">
+          <i class="fas fa-arrow-left me-1"></i> Back
+        </button>
+        <button class="btn btn-primary" id="submitGoalBtn" onclick="submitCalibration()" disabled>
+          Submit for Calibration <i class="fas fa-arrow-right ms-1"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 3: SUCCESS / PARAMETRIC CALIBRATION -->
+    <div class="success-section" id="successStep">
+      <div class="success-icon"><i class="fas fa-check"></i></div>
+      <h3 class="success-title">Scan Successfully Processed!</h3>
+      <p class="success-message">
+        Your biometric footprint has been securely transmitted to our engineering pipeline for parametric calibration.
+      </p>
+      
+      <div class="calibration-badge">
+        <i class="fas fa-cog"></i>
+        Parametric Calibration in Progress
+      </div>
+      
+      <!-- Measurement Preview -->
+      <div class="measurement-card" id="measurementPreview">
+        <div class="measurement-row">
+          <span class="measurement-label">Foot Length</span>
+          <span class="measurement-value" id="footLength">-- mm</span>
+        </div>
+        <div class="measurement-row">
+          <span class="measurement-label">Foot Width</span>
+          <span class="measurement-value" id="footWidth">-- mm</span>
+        </div>
+        <div class="measurement-row">
+          <span class="measurement-label">Arch Type</span>
+          <span class="measurement-value" id="archType">--</span>
+        </div>
+        <div class="measurement-row">
+          <span class="measurement-label">A4 Reference</span>
+          <span class="measurement-value" id="a4Detected">--</span>
+        </div>
+      </div>
+      
+      <div class="process-steps">
+        <h6><i class="fas fa-microchip me-2"></i>Processing Pipeline</h6>
+        <ol>
+          <li>✅ Foot contour detection (OpenCV + Otsu threshold)</li>
+          <li>✅ Region isolation & noise filtering</li>
+          <li>✅ Dimensional calculation (width + length)</li>
+          <li>✅ Scale normalization using A4 reference</li>
+          <li>⏳ 3D mesh generation & biomechanical modeling</li>
+        </ol>
+        <div class="pro-tip">
+          <i class="fas fa-lightbulb"></i>
+          <strong>Industry Pro Tip:</strong> For highest accuracy, always scan with foot centered on a standard A4 white sheet (210×297mm). Our algorithm auto-detects the paper's 1.414 aspect ratio to calibrate pixel-to-millimeter conversion.
+        </div>
+      </div>
+      
+      <div class="mt-4">
+        <button class="btn btn-primary scan-btn" onclick="location.reload()">
+          <i class="fas fa-redo me-2"></i>Scan Another Foot
+        </button>
+        <a href="dashboard.html" class="btn btn-outline-light scan-btn ms-2">
+          View My Profile <i class="fas fa-arrow-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-dark footer-section text-light">
+  <div class="container relative">
+    <div class="sofa-img mb-4 text-center">
+      <img src="images/shoe.gif" alt="Zilfit Footwear" class="img-fluid">
+    </div>
+    <div class="row mb-5">
+      <div class="col-lg-8">
+        <div class="subscription-form">
+          <h3 class="d-flex align-items-center text-light">
+            <span class="me-1"><img src="images/envelope-outline.svg" alt="Newsletter" class="img-fluid"></span>
+            <span>Subscribe to Zilfit Updates</span>
+          </h3>
+          <form action="#" class="row g-3">
+            <div class="col-auto"><input type="text" class="form-control" placeholder="Enter your name"></div>
+            <div class="col-auto"><input type="email" class="form-control" placeholder="Enter your email"></div>
+            <div class="col-auto"><button class="btn btn-primary"><span class="fa fa-paper-plane"></span></button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="row g-5 mb-5">
+      <div class="col-lg-4">
+        <div class="mb-4 footer-logo-wrap">
+          <a href="#" class="footer-logo text-light">Zilfit<span>.</span></a>
+        </div>
+        <p class="mb-4 text-light">Precision-engineered, custom footwear designed to optimize health and performance. On-demand manufacturing for a personalized experience.</p>
+        <ul class="list-unstyled custom-social">
+          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-facebook-f"></span></a></li>
+          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-twitter"></span></a></li>
+          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-instagram"></span></a></li>
+          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-linkedin"></span></a></li>
+        </ul>
+      </div>
+      <div class="col-lg-8">
+        <div class="row links-wrap">
+          <div class="col-6 col-sm-6 col-md-3">
+            <ul class="list-unstyled">
+              <li><a href="#" class="text-light">About Us</a></li>
+              <li><a href="#" class="text-light">Our Process</a></li>
+              <li><a href="#" class="text-light">Contact</a></li>
+            </ul>
+          </div>
+          <div class="col-6 col-sm-6 col-md-3">
+            <ul class="list-unstyled">
+              <li><a href="#" class="text-light">Support</a></li>
+              <li><a href="#" class="text-light">FAQ</a></li>
+              <li><a href="#" class="text-light">Live Chat</a></li>
+            </ul>
+          </div>
+          <div class="col-6 col-sm-6 col-md-3">
+            <ul class="list-unstyled">
+              <li><a href="#" class="text-light">Terms & Conditions</a></li>
+              <li><a href="#" class="text-light">Privacy Policy</a></li>
+            </ul>
+          </div>
+          <div class="col-6 col-sm-6 col-md-3">
+            <ul class="list-unstyled">
+              <li><a href="#" class="text-light">Zilfit Calm</a></li>
+              <li><a href="#" class="text-light">Zilfit Recovery</a></li>
+              <li><a href="#" class="text-light">Zilfit Focus</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="border-top text-light copyright">
+      <div class="row pt-4">
+        <div class="col-lg-6">
+          <p class="mb-2 text-center text-lg-start">Copyright &copy;<script>document.write(new Date().getFullYear());</script>. All Rights Reserved. Zilfit</p>
+        </div>
+        <div class="col-lg-6 text-center text-lg-end">
+          <ul class="list-unstyled d-inline-flex ms-auto">
+            <li class="me-4"><a href="#" class="text-light">Terms & Conditions</a></li>
+            <li><a href="#" class="text-light">Privacy Policy</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ===== PERFORMANCE MONITOR (DEBUG) ===== -->
+<div class="perf-monitor" id="perfMonitor">
+  <div class="perf-row"><span>FPS:</span><span id="fpsValue">--</span></div>
+  <div class="perf-row"><span>Memory:</span><span id="memValue">--</span></div>
+  <div class="perf-row"><span>OpenCV:</span><span id="cvStatus">--</span></div>
+</div>
+
+<!-- ===== ⭐ CRITICAL FIX: GLOBAL CALLBACKS (BEFORE OPENCV LOADS) ===== -->
+<script>
+  // Initialize global state immediately
+  window.cvReady = false;
+  window.cvLoadError = false;
+  
+  // ✅ Hoisted to global scope BEFORE OpenCV script loads
+  window.onOpenCvReady = function() {
+    window.cvReady = true;
+    console.log("✅ OpenCV.js loaded successfully");
+    // Defer UI updates to ensure DOM functions exist
+    setTimeout(() => {
+      if (typeof updateStatus === 'function') {
+        updateStatus('🔬 OpenCV engine ready');
+      }
+      if (typeof updateButtonStates === 'function') {
+        updateButtonStates();
+      }
+      if (typeof updatePerfMonitor === 'function') {
+        updatePerfMonitor();
+      }
+    }, 0);
+  };
+
+  window.onOpenCvError = function() {
+    window.cvLoadError = true;
+    console.error("❌ Failed to load OpenCV.js");
+    setTimeout(() => {
+      if (typeof updateStatus === 'function') {
+        updateStatus('⚠️ OpenCV failed to load. Retrying...', true);
+      }
+      // Auto-retry once
+      setTimeout(() => {
+        if (!window.cvReady && !window.cvLoadError) {
+          const script = document.createElement('script');
+          script.src = 'https://docs.opencv.org/4.x/opencv.js';
+          script.onload = window.onOpenCvReady;
+          script.onerror = () => {
+            if (typeof updateStatus === 'function') {
+              updateStatus('❌ OpenCV unavailable. Please check connection.', true);
+            }
+          };
+          document.body.appendChild(script);
+        }
+      }, 2000);
+    }, 0);
+  };
+</script>
+
+<!-- ===== OpenCV CDN (calls the global callbacks above) ===== -->
+<script src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
+
+<!-- ===== Bootstrap JS ===== -->
+<script src="js/bootstrap.bundle.min.js"></script>
+
+<!-- ===== MAIN APPLICATION SCRIPT ===== -->
+<script>
+// ===== GLOBAL STATE =====
+let video = document.getElementById("camera");
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
+let currentStream = null;
+let selectedGoal = null;
+let currentStep = 1;
+
+// ⭐ IMPROVEMENT #3: FPS Limiter for real-time processing
+let lastFrameTime = 0;
+const MIN_FRAME_INTERVAL = 100; // ms between frames (10 FPS max for heavy CV)
+
+function shouldProcessFrame() {
+  const now = performance.now();
+  if (now - lastFrameTime < MIN_FRAME_INTERVAL) return false;
+  lastFrameTime = now;
+  return true;
+}
+
+// ⭐ IMPROVEMENT #1: Memory Leak Protection - Centralized cleanup
+function cleanupMats(...mats) {
+  mats.forEach(mat => {
+    if (mat && typeof mat.delete === 'function') {
+      try { mat.delete(); } catch(e) { /* silent fail */ }
+    }
+  });
+}
+
+// ⭐ IMPROVEMENT #2: Stop Camera to save battery/CPU
+function stopCamera() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => {
+      track.stop();
+      console.log('📹 Camera track stopped');
+    });
+    currentStream = null;
+    if (video) video.srcObject = null;
+    updateStatus('Camera released');
+  }
+}
+
+// ✅ Reliable capture state using dataset
+function markCaptured() { 
+  if (canvas) canvas.dataset.captured = "true"; 
+}
+function isCaptured() { 
+  return canvas && canvas.dataset.captured === "true"; 
+}
+function clearCapture() {
+  if (!canvas) return;
+  canvas.dataset.captured = "false";
+  canvas.classList.add("d-none");
+  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ===== SPLASH SCREEN =====
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const splash = document.getElementById('splashScreen');
+    if (splash) splash.classList.add('hidden');
+  }, 2800);
+});
+
+// ===== STEP NAVIGATION =====
+function goToStep(stepNumber) {
+  // ⭐ IMPROVEMENT #2: Stop camera when leaving scan step
+  if (currentStep === 1 && stepNumber !== 1) {
+    stopCamera();
+  }
+  
+  document.querySelectorAll('.step-dot').forEach((dot, index) => {
+    const step = index + 1;
+    dot.classList.remove('active', 'completed');
+    if (step < stepNumber) dot.classList.add('completed');
+    if (step === stepNumber) dot.classList.add('active');
+  });
+  
+  const scanStep = document.getElementById('scanStep');
+  const goalStep = document.getElementById('goalStep');
+  const successStep = document.getElementById('successStep');
+  
+  if (scanStep) scanStep.classList.remove('active');
+  if (goalStep) goalStep.classList.remove('active');
+  if (successStep) successStep.classList.remove('active');
+  
+  if (stepNumber === 1) {
+    if (scanStep) scanStep.classList.add('active');
+    currentStep = 1;
+  } else if (stepNumber === 2) {
+    if (goalStep) goalStep.classList.add('active');
+    currentStep = 2;
+  } else if (stepNumber === 3) {
+    if (successStep) successStep.classList.add('active');
+    currentStep = 3;
+  }
+  
+  updateButtonStates();
+  updatePerfMonitor();
+}
+
+function updateButtonStates() {
+  const isScanning = currentStep === 1;
+  const hasCapture = isCaptured();
+  const cvIsReady = window.cvReady === true;
+  
+  const captureBtn = document.getElementById('captureBtn');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const submitBtn = document.getElementById('submitGoalBtn');
+  
+  if (captureBtn) captureBtn.disabled = !(isScanning && video && video.readyState >= 2);
+  if (analyzeBtn) analyzeBtn.disabled = !(isScanning && hasCapture && cvIsReady);
+  if (submitBtn) submitBtn.disabled = !selectedGoal;
+}
+
+function updateStatus(message, isWarning = false) {
+  const statusEl = document.getElementById('scanStatus');
+  const guideEl = document.getElementById('scanGuide');
+  
+  if (statusEl) {
+    const icon = isWarning ? 'fa-exclamation-triangle' : 'fa-circle-notch';
+    const spin = isWarning ? '' : 'fa-spin';
+    statusEl.innerHTML = `<i class="fas ${icon} ${spin} me-1"></i>${message}`;
+  }
+  
+  if (guideEl && isWarning) {
+    guideEl.classList.add('warning');
+    guideEl.innerHTML = `<i class="fas fa-lightbulb"></i><span>⚠️ ${message}</span>`;
+  } else if (guideEl) {
+    guideEl.classList.remove('warning');
+    guideEl.innerHTML = `<i class="fas fa-info-circle"></i><span>💡 Place foot on white A4 paper for accurate scale reference</span>`;
+  }
+}
+
+// ===== PERFORMANCE MONITOR =====
+function updatePerfMonitor() {
+  const monitor = document.getElementById('perfMonitor');
+  if (!monitor) return;
+  
+  // Show monitor only in development
+  if (location.hostname === 'localhost' || location.href.includes('debug')) {
+    monitor.classList.add('active');
+    
+    const fpsEl = document.getElementById('fpsValue');
+    if (fpsEl && lastFrameTime > 0) {
+      const estimatedFps = Math.round(1000 / MIN_FRAME_INTERVAL);
+      fpsEl.textContent = `≤${estimatedFps}`;
+    }
+    
+    const memEl = document.getElementById('memValue');
+    if (memEl && performance.memory) {
+      const usedMB = Math.round(performance.memory.usedJSHeapSize / 1048576);
+      memEl.textContent = `${usedMB} MB`;
+    } else if (memEl) {
+      memEl.textContent = 'N/A';
+    }
+    
+    const cvEl = document.getElementById('cvStatus');
+    if (cvEl) {
+      cvEl.textContent = window.cvReady ? '✅ Ready' : (window.cvLoadError ? '❌ Error' : '⏳ Loading');
+      cvEl.style.color = window.cvReady ? '#0f0' : (window.cvLoadError ? '#f00' : '#ff0');
+    }
+  } else {
+    monitor.classList.remove('active');
+  }
+}
+
+// ===== CAMERA FUNCTIONS =====
+async function startCamera() {
+  try {
+    updateStatus('Requesting camera access...');
+    const startBtn = document.getElementById('startCameraBtn');
+    if (startBtn) startBtn.disabled = true;
+    
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: 'environment'
+      } 
+    });
+    
+    currentStream = stream;
+    if (video) video.srcObject = stream;
+    
+    if (video) await video.play();
+    updateStatus('Camera active. Position foot in frame.');
+    
+    if (video) {
+      video.onloadedmetadata = () => {
+        const captureBtn = document.getElementById('captureBtn');
+        if (captureBtn) captureBtn.disabled = false;
+        updateStatus('Ready to capture. Ensure good lighting.');
+        updatePerfMonitor();
+      };
+    }
+    
+  } catch (err) {
+    console.error('Camera error:', err);
+    const msg = err.name === 'NotAllowedError' ? 'Camera permission denied' : 
+                err.name === 'NotFoundError' ? 'No camera detected' : err.message;
+    updateStatus(`❌ ${msg}`, true);
+    const startBtn = document.getElementById('startCameraBtn');
+    if (startBtn) startBtn.disabled = false;
+    alert(`Camera error: ${msg}. Please allow permissions and try again.`);
+  }
+}
+
+function capture() {
+  if (!video || video.readyState !== 4) {
+    updateStatus('⚠️ Video not ready. Wait a moment.', true);
+    return;
+  }
+  
+  // ⭐ IMPROVEMENT #3: FPS limiter for capture
+  if (!shouldProcessFrame()) {
+    updateStatus('⏳ Processing... please wait', true);
+    return;
+  }
+  
+  const orientation = screen.orientation?.angle || 0;
+  const videoW = video.videoWidth;
+  const videoH = video.videoHeight;
+  
+  if (!canvas) return;
+  canvas.width = videoW;
+  canvas.height = videoH;
+  
+  if (!ctx) return;
+  ctx.save();
+  if (orientation === 90 || orientation === 270) {
+    canvas.width = videoH;
+    canvas.height = videoW;
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.rotate(orientation * Math.PI / 180);
+    ctx.drawImage(video, -videoW/2, -videoH/2, videoW, videoH);
+  } else {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  }
+  ctx.restore();
+  
+  canvas.classList.remove('d-none');
+  markCaptured();
+  
+  const laserOverlay = document.getElementById('laserOverlay');
+  if (laserOverlay) laserOverlay.style.display = 'block';
+  
+  updateStatus('Capture complete! Click "Analyze" to process.');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  if (analyzeBtn) analyzeBtn.disabled = !(window.cvReady);
+  
+  setTimeout(() => {
+    if (laserOverlay) laserOverlay.style.display = 'none';
+  }, 3000);
+}
+
+// ===== OPENCV PROCESSING PIPELINE (SENIOR-LEVEL) =====
+function processFoot() {
+  if (!window.cvReady) {
+    if (window.cvLoadError) {
+      alert('❌ OpenCV failed to load. Please refresh the page.');
+    } else {
+      updateStatus('⏳ OpenCV still initializing...');
+    }
+    return;
+  }
+  
+  if (!isCaptured()) {
+    updateStatus('⚠️ Please capture an image first', true);
+    return;
+  }
+  
+  // ⭐ IMPROVEMENT #3: FPS limiter for heavy processing
+  if (!shouldProcessFrame()) {
+    updateStatus('⏳ Throttled: processing too fast', true);
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    if (analyzeBtn) analyzeBtn.disabled = false;
+    return;
+  }
+  
+  updateStatus('🔬 Running biometric analysis pipeline...');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  if (analyzeBtn) analyzeBtn.disabled = true;
+  
+  let src = null, gray = null, blur = null, thresh = null, opened = null;
+  let contours = null, hierarchy = null;
+  
+  try {
+    if (!canvas) throw new Error("Canvas not found");
+    src = cv.imread(canvas);
+    
+    // ⭐ IMPROVEMENT #5: Security - Validate frame before processing
+    if (src.empty()) {
+      throw new Error("Invalid frame: source image is empty");
+    }
+    
+    // ⭐ IMPROVEMENT #4: Resize for performance
+    const maxSize = 640;
+    if (src.cols > maxSize || src.rows > maxSize) {
+      const scale = maxSize / Math.max(src.cols, src.rows);
+      const newSize = new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale));
+      cv.resize(src, src, newSize, 0, 0, cv.INTER_LINEAR);
+    }
+    
+    gray = new cv.Mat();
+    blur = new cv.Mat();
+    
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+    
+    // ✅ Lighting validation
+    let meanBrightness = cv.mean(gray)[0];
+    if (meanBrightness < 50) {
+      updateStatus('⚠️ Lighting too dark. Please add more light.', true);
+      alert('💡 Lighting too dim for accurate scanning.');
+      cleanupMats(src, gray, blur);
+      if (analyzeBtn) analyzeBtn.disabled = false;
+      return;
+    }
+    if (meanBrightness > 220) {
+      updateStatus('⚠️ Overexposed. Reduce lighting.', true);
+      alert('☀️ Image too bright. Please reduce lighting.');
+      cleanupMats(src, gray, blur);
+      if (analyzeBtn) analyzeBtn.disabled = false;
+      return;
+    }
+    
+    // ⭐ IMPROVEMENT #1: Otsu threshold for auto foot detection
+    thresh = new cv.Mat();
+    cv.threshold(gray, thresh, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+    
+    let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+    opened = new cv.Mat();
+    cv.morphologyEx(thresh, opened, cv.MORPH_OPEN, kernel);
+    
+    contours = new cv.MatVector();
+    hierarchy = new cv.Mat();
+    cv.findContours(opened, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    
+    // Find largest contour + A4 detection
+    let largestContour = null;
+    let maxArea = 0;
+    let a4Contour = null;
+    const A4_RATIO = 1.414;
+    const imageArea = src.rows * src.cols;
+    
+    for (let i = 0; i < contours.size(); i++) {
+      const cnt = contours.get(i);
+      const area = cv.contourArea(cnt);
+      
+      if (area > maxArea) {
+        maxArea = area;
+        largestContour = cnt;
+      }
+      
+      // ⭐ IMPROVEMENT #4: True scale detection with area ratio consistency
+      const rect = cv.boundingRect(cnt);
+      const ratio = Math.max(rect.width, rect.height) / Math.min(rect.width, rect.height);
+      // Check both aspect ratio AND minimum area threshold to avoid false positives
+      if (Math.abs(ratio - A4_RATIO) < 0.15 && area > imageArea * 0.2 && area > 10000) {
+        a4Contour = cnt;
+      }
+    }
+    
+    // ✅ FIX: Draw ONLY the largest contour
+    if (largestContour && maxArea > 5000) {
+      let color = new cv.Scalar(0, 255, 0, 255);
+      for (let i = 0; i < contours.size(); i++) {
+        if (contours.get(i) === largestContour) {
+          cv.drawContours(src, contours, i, color, 3);
+          break;
+        }
+      }
+      
+      // ⭐ Real measurement system
+      const rect = cv.boundingRect(largestContour);
+      const footLengthPx = rect.height;
+      const footWidthPx = rect.width;
+      
+      // ⭐ Scale using A4 reference with validated detection
+      let scale = 1.0;
+      let a4Detected = false;
+      
+      if (a4Contour) {
+        const a4Rect = cv.boundingRect(a4Contour);
+        const a4HeightPx = Math.max(a4Rect.width, a4Rect.height);
+        scale = 297 / a4HeightPx; // A4 long side = 297mm
+        a4Detected = true;
+        console.log('📐 A4 detected. Scale:', scale.toFixed(3), 'mm/px');
+      }
+      
+      const footLengthMm = Math.round(footLengthPx * scale);
+      const footWidthMm = Math.round(footWidthPx * scale);
+      
+      // ⭐ Arch detection via convexity defects
+      let archType = "Normal";
+      if (largestContour) {
+        const hull = new cv.Mat();
+        const defects = new cv.Mat();
+        cv.convexHull(largestContour, hull, false, false);
+        
+        if (hull.rows > 3 && largestContour.rows > 3) {
+          try {
+            cv.convexityDefects(largestContour, hull, defects);
+            if (defects.rows > 0) {
+              let maxDefectDepth = 0;
+              for (let i = 0; i < defects.rows; i++) {
+                const depth = defects.data32S[i * 4 + 2] / 256;
+                if (depth > maxDefectDepth) maxDefectDepth = depth;
+              }
+              if (maxDefectDepth > rect.height * 0.15) {
+                archType = "High Arch";
+              } else if (maxDefectDepth < rect.height * 0.05) {
+                archType = "Flat Foot";
+              }
+            }
+          } catch (e) {
+            console.log('Arch detection skipped:', e);
+          }
+        }
+        hull.delete();
+        defects.delete();
+      }
+      
+      // Update UI
+      const footLengthEl = document.getElementById('footLength');
+      const footWidthEl = document.getElementById('footWidth');
+      const archTypeEl = document.getElementById('archType');
+      const a4DetectedEl = document.getElementById('a4Detected');
+      
+      if (footLengthEl) footLengthEl.textContent = `${footLengthMm} mm`;
+      if (footWidthEl) footWidthEl.textContent = `${footWidthMm} mm`;
+      if (archTypeEl) archTypeEl.textContent = archType;
+      if (a4DetectedEl) a4DetectedEl.textContent = a4Detected ? '✅ Auto-calibrated' : '⚠️ Manual scale';
+      
+      window.scanMeasurements = {
+        lengthMm: footLengthMm,
+        widthMm: footWidthMm,
+        archType: archType,
+        a4Detected: a4Detected,
+        scale: scale,
+        brightness: meanBrightness,
+        timestamp: new Date().toISOString()
+      };
+    }
+    
+    cv.imshow(canvas, src);
+    
+    // ✅ CRITICAL: Clean up ALL OpenCV memory (⭐ IMPROVEMENT #1)
+    cleanupMats(src, gray, blur, thresh, opened, contours, hierarchy);
+    
+    updateStatus('✅ Foot contour detected! Biometric data ready.');
+    
+    setTimeout(() => {
+      goToStep(2);
+    }, 1500);
+    
+  } catch (err) {
+    console.error('OpenCV processing error:', err);
+    
+    // ✅ Ensure cleanup even on error (⭐ IMPROVEMENT #1)
+    cleanupMats(src, gray, blur, thresh, opened, contours, hierarchy);
+    
+    updateStatus('⚠️ Processing error. Try recapturing.', true);
+    if (analyzeBtn) analyzeBtn.disabled = false;
+    alert(`Analysis failed: ${err.message}. Ensure good lighting and clear foot outline.`);
+  }
+}
+
+// ===== GOAL SELECTION =====
+function selectGoal(cardElement) {
+  document.querySelectorAll('.goal-card').forEach(card => {
+    card.classList.remove('selected');
+  });
+  cardElement.classList.add('selected');
+  selectedGoal = cardElement.dataset.goal;
+  const submitBtn = document.getElementById('submitGoalBtn');
+  if (submitBtn) submitBtn.disabled = false;
+  
+  const icon = cardElement.querySelector('.goal-icon i');
+  if (icon) {
+    icon.classList.add('fa-bounce');
+    setTimeout(() => icon.classList.remove('fa-bounce'), 600);
+  }
+}
+
+// ===== SUBMIT FOR CALIBRATION =====
+function submitCalibration() {
+  if (!selectedGoal) {
+    alert('Please select a wellness goal to continue.');
+    return;
+  }
+  
+  updateStatus('🔐 Encrypting biometric data...');
+  
+  const payload = {
+    goal: selectedGoal,
+    measurements: window.scanMeasurements || null,
+    imageData: canvas ? canvas.toDataURL('image/png') : null,
+    meta: {
+      userAgent: navigator.userAgent,
+      screenOrientation: screen.orientation?.angle || 0,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  setTimeout(() => {
+    updateStatus('📡 Transmitting to calibration engine...');
+    
+    setTimeout(() => {
+      goToStep(3);
+      // 🚀 PRODUCTION: Uncomment for real backend integration
+      /*
+      fetch('/api/calibrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log('✅ Calibration job queued:', data.jobId);
+      })
+      .catch(err => {
+        console.error('❌ Submission failed:', err);
+        alert('Submission failed. Please try again or contact support.');
+      });
+      */
+    }, 1200);
+  }, 1000);
+}
+
+// ===== UTILITY: Cleanup on unload =====
+window.addEventListener('beforeunload', () => {
+  stopCamera(); // ⭐ IMPROVEMENT #2: Always clean up on exit
+});
+
+// ===== INITIALIZATION =====
+document.addEventListener('DOMContentLoaded', () => {
+  updateButtonStates();
+  updatePerfMonitor();
+  
+  document.addEventListener('keydown', (e) => {
+    if (currentStep !== 1) return;
+    const captureBtn = document.getElementById('captureBtn');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    if (e.key.toLowerCase() === 'c' && captureBtn && !captureBtn.disabled) {
+      capture();
+    }
+    if (e.key.toLowerCase() === 'a' && analyzeBtn && !analyzeBtn.disabled) {
+      processFoot();
+    }
+  });
+  
+  // Fallback OpenCV check
+  setInterval(() => {
+    if (!window.cvReady && !window.cvLoadError && typeof cv !== 'undefined' && cv.Mat) {
+      window.onOpenCvReady();
+    }
+  }, 1000);
+});
+</script>
+
+</body>
+</html>

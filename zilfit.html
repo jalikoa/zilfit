@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Zilfit — Custom Biomechanical Footwear</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/zilfit.css">
+  </head>
+  <body class="zf-dark">
+    <header id="hero" class="zf-hero d-flex align-items-center justify-content-center">
+      <div class="zf-hero-inner text-center">
+        <div class="zf-logo" aria-hidden="true">
+          <svg width="120" height="120" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="g" x1="0" x2="1">
+                <stop offset="0" stop-color="#00FFCC" />
+                <stop offset="1" stop-color="#00D6B3" />
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round" />
+            <path d="M30 60 L50 32 L70 60" fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round" />
+          </svg>
+        </div>
+        <h1 class="zf-title">Your feet are the map of your health.</h1>
+        <p class="zf-sub">Precision-engineered footwear, parametric to you.</p>
+        <div class="zf-scroll-indicator" aria-hidden="true">
+          <span></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="scan" class="zf-section container">
+        <h2 class="section-title">Biometric Scan Simulation</h2>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="zf-camera" role="img" aria-label="Simulated foot scan">
+              <div class="zf-laser"></div>
+              <div class="zf-data-points">
+                <div class="point p1">Analyzing pressure zones…</div>
+                <div class="point p2">Calculating arch height…</div>
+                <div class="point p3">Mapping reflexology points…</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6 d-flex align-items-center">
+            <div>
+              <p class="lead">A high-fidelity simulation gives you a sense of Zilfit's on-demand biometric analysis. This is a placeholder for future 3D scanning integrations.</p>
+              <button id="start-scan" class="btn btn-neon">Run Simulation</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="products" class="zf-section container">
+        <h2 class="section-title">Choose Your Goal</h2>
+        <div class="row gy-4">
+          <div class="col-md-4">
+            <article class="zf-card" tabindex="0">
+              <div class="card-header">Zilfit Calm</div>
+              <div class="card-body">Low-impact lattice for restful recovery.</div>
+            </article>
+          </div>
+          <div class="col-md-4">
+            <article class="zf-card" tabindex="0">
+              <div class="card-header">Zilfit Recovery</div>
+              <div class="card-body">Targeted support for strain repair.</div>
+            </article>
+          </div>
+          <div class="col-md-4">
+            <article class="zf-card" tabindex="0">
+              <div class="card-header">Zilfit Focus</div>
+              <div class="card-body">Responsive lattice for performance and balance.</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="tracker" class="zf-section container">
+        <h2 class="section-title">Custom-Engineered for You</h2>
+        <p class="muted">Your biometric profile has been received. Your footwear is now being generated.</p>
+        <div class="zf-tracker row g-0 align-items-center">
+          <div class="col-12">
+            <ol class="tracker-list">
+              <li class="stage">Digital Footprint Analysis</li>
+              <li class="stage">Parametric Lattice Calibration</li>
+              <li class="stage">Precision 3D Printing</li>
+              <li class="stage">Quality Testing & Global Shipping</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="zf-footer text-center">
+      <small>© Zilfit — Engineering Precision</small>
+    </footer>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/zilfit.js"></script>
+  </body>
+</html>
