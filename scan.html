@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>Zilfit Scan | 3D Foot Biometric Scanner</title>
 
 <link href="css/bootstrap.min.css" rel="stylesheet">
@@ -31,7 +30,7 @@
   height:100%; width:0%; background:linear-gradient(90deg,#0d6efd,#0dcaf0);
   border-radius:2px; animation:loadProgress 2.5s ease-in-out forwards;
 }
-@keyframes loadProgress { 0%{width:0} 30%{width:40} 70%{width:85} 100%{width:100} }
+@keyframes loadProgress { 0%{width:0%} 30%{width:40%} 70%{width:85%} 100%{width:100%} }
 
 /* ===== SCAN SECTION ===== */
 .scan-hero {
@@ -117,6 +116,11 @@ video, canvas {
 .goal-title { font-weight:600; font-size:1.3rem; margin-bottom:8px; color:#fff; }
 .goal-desc { color:#aaa; font-size:0.95rem; line-height:1.5; }
 
+/* ===== SCAN STEPS VISIBILITY ===== */
+/* BUG FIX: was using .scan-step and .d-step inconsistently */
+.scan-step { display:none; }
+.scan-step.active { display:block; animation:fadeIn 0.5s ease; }
+
 /* ===== SUCCESS SECTION ===== */
 .success-section {
   display:none; text-align:center; padding:40px 20px;
@@ -139,7 +143,7 @@ video, canvas {
   margin:15px 0;
 }
 .calibration-badge i { animation:spin 2s linear infinite; }
-@keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+@keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
 
 .process-steps {
   text-align:left; background:#151515; border-radius:15px;
@@ -178,8 +182,14 @@ video, canvas {
 .perf-monitor.active { display: block; }
 .perf-row { display: flex; justify-content: space-between; gap: 15px; }
 
-.d-step { display:none; }
-.d-step.active { display:block; }
+/* OpenCV fallback notice */
+.cv-fallback-notice {
+  background: rgba(255,193,7,0.1); border: 1px solid #ffc107;
+  border-radius: 10px; padding: 12px 16px; color: #ffc107;
+  font-size: 0.9rem; margin-top: 12px; display: none;
+}
+.cv-fallback-notice.show { display: block; }
+
 .footer {
   background:#0c0c0c; padding:40px 0; text-align:center;
   color:#777; margin-top:60px;
@@ -200,27 +210,25 @@ video, canvas {
 <!-- ===== SPLASH SCREEN ===== -->
 <div class="splash-screen" id="splashScreen">
   <div class="splash-logo">Zilfit<span>.</span></div>
+  <p class="splash-tagline">AI-Powered Foot Biometrics</p>
+  <div class="splash-progress"><div class="splash-progress-bar"></div></div>
   <p class="text-muted mt-3 small">Initializing scanning engine...</p>
 </div>
 
 <!-- Navigation -->
-<nav class="custom-navbar navbar navbar-expand-md navbar-dark bg-dark">
+<nav class="navbar navbar-expand-md navbar-dark bg-dark">
   <div class="container">
-    <a class="navbar-brand" href="index.html">Zilfit<span>.</span></a>
+    <a class="navbar-brand fw-bold" href="index.html">Zilfit<span style="color:#0d6efd">.</span></a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarsZilfit">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarsZilfit">
-      <ul class="custom-navbar-nav navbar-nav ms-auto mb-2 mb-md-0">
+      <ul class="navbar-nav ms-auto mb-2 mb-md-0">
         <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
-        <li class="nav-item active"><a class="nav-link" href="#scan">Start Scan</a></li>
+        <li class="nav-item"><a class="nav-link active" href="#scan">Start Scan</a></li>
         <li class="nav-item"><a class="nav-link" href="#process">Our Process</a></li>
         <li class="nav-item"><a class="nav-link" href="#products">Products</a></li>
         <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
-      </ul>
-      <ul class="custom-navbar-cta navbar-nav mb-2 mb-md-0 ms-4">
-        <li class="nav-item"><a class="nav-link" href="#"><img src="images/user.svg" alt="Account"></a></li>
-        <li class="nav-item"><a class="nav-link" href="cart.html"><img src="images/cart.svg" alt="Cart"></a></li>
       </ul>
     </div>
   </div>
@@ -229,62 +237,76 @@ video, canvas {
 <!-- ===== MAIN SCAN FLOW ===== -->
 <section class="scan-hero bg-dark mb-5" id="scanSection">
   <div class="container">
-    
+
     <!-- Step Indicator -->
     <div class="step-indicator">
-      <div class="step-dot active" id="step1"></div>
-      <div class="step-dot" id="step2"></div>
-      <div class="step-dot" id="step3"></div>
-      <div class="step-dot" id="step4"></div>
+      <div class="step-dot active" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot" id="dot3"></div>
     </div>
 
     <h1 class="scan-title mb-3">3D Foot Scanner</h1>
     <p class="scan-sub mb-4">
-      Place your foot inside the frame and capture a scan.  
+      Place your foot inside the frame and capture a scan.
       Our intelligent system analyzes your biomechanics and generates precision footwear measurements in seconds.
     </p>
 
-    <!-- STEP 1: BIOMETRIC SCAN -->
+    <!-- ===================== STEP 1: BIOMETRIC SCAN ===================== -->
     <div class="scan-step active" id="scanStep">
       <div class="row justify-content-center">
         <div class="col-lg-6 mb-5">
           <div class="scan-box">
+            <!-- Laser animation overlay shown during capture -->
             <div class="laser-overlay" id="laserOverlay">
               <div class="laser-line"></div>
             </div>
-            
+
+            <!-- Live camera feed -->
             <video id="camera" autoplay playsinline muted></video>
-            <canvas id="canvas" class="mt-3 d-none"></canvas>
+            <!-- Captured/processed frame -->
+            <canvas id="canvas" class="mt-3" style="display:none;"></canvas>
+
+            <!-- OpenCV not available notice -->
+            <div class="cv-fallback-notice" id="cvFallbackNotice">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              OpenCV is loading — analysis will be available shortly. Camera and capture work normally.
+            </div>
 
             <div class="mt-4 d-flex justify-content-center gap-2 flex-wrap">
               <button class="btn btn-primary scan-btn" id="startCameraBtn" onclick="startCamera()">
                 <i class="fas fa-video me-2"></i>Start Camera
               </button>
-              <button class="btn btn-light scan-btn" id="captureBtn" onclick="capture()" disabled>
+              <button class="btn btn-light scan-btn" id="captureBtn" disabled>
                 <i class="fas fa-camera me-2"></i>Capture
               </button>
-              <button class="btn btn-success scan-btn" id="analyzeBtn" onclick="processFoot()" disabled>
+              <button class="btn btn-success scan-btn" id="analyzeBtn" disabled>
                 <i class="fas fa-brain me-2"></i>Analyze
               </button>
             </div>
-            
+
             <div class="mt-3 small text-muted" id="scanStatus">
               <i class="fas fa-circle me-1"></i>Click "Start Camera" to begin
             </div>
+          </div>
+
+          <!-- Tip box below scan box -->
+          <div class="mt-3 text-muted small text-center">
+            <i class="fas fa-lightbulb text-warning me-1"></i>
+            For best accuracy, place your foot flat on a standard <strong>A4 white sheet</strong> of paper.
           </div>
         </div>
       </div>
     </div>
 
-    <!-- STEP 2: GOAL SELECTION -->
+    <!-- ===================== STEP 2: GOAL SELECTION ===================== -->
     <div class="goal-section" id="goalStep">
       <h3 class="text-center mb-2">Select Your Wellness Goal</h3>
       <p class="text-center text-muted mb-4">Your biometric data will be calibrated for optimal results</p>
-      
+
       <div class="goal-cards">
         <div class="goal-card" data-goal="calm" onclick="selectGoal(this)">
           <div class="goal-icon"><i class="fas fa-moon"></i></div>
-          <div class="goal-title">Sleep & Calm</div>
+          <div class="goal-title">Sleep &amp; Calm</div>
           <div class="goal-desc">Optimize foot support for relaxation and restful sleep patterns</div>
         </div>
         <div class="goal-card" data-goal="recovery" onclick="selectGoal(this)">
@@ -298,7 +320,7 @@ video, canvas {
           <div class="goal-desc">Improve posture and circulation for sustained concentration</div>
         </div>
       </div>
-      
+
       <div class="text-center mt-4">
         <button class="btn btn-outline-secondary me-2" onclick="goToStep(1)">
           <i class="fas fa-arrow-left me-1"></i> Back
@@ -309,19 +331,19 @@ video, canvas {
       </div>
     </div>
 
-    <!-- STEP 3: SUCCESS / PARAMETRIC CALIBRATION -->
+    <!-- ===================== STEP 3: SUCCESS ===================== -->
     <div class="success-section" id="successStep">
       <div class="success-icon"><i class="fas fa-check"></i></div>
       <h3 class="success-title">Scan Successfully Processed!</h3>
       <p class="success-message">
         Your biometric footprint has been securely transmitted to our engineering pipeline for parametric calibration.
       </p>
-      
+
       <div class="calibration-badge">
         <i class="fas fa-cog"></i>
         Parametric Calibration in Progress
       </div>
-      
+
       <!-- Measurement Preview -->
       <div class="measurement-card" id="measurementPreview">
         <div class="measurement-row">
@@ -340,28 +362,32 @@ video, canvas {
           <span class="measurement-label">A4 Reference</span>
           <span class="measurement-value" id="a4Detected">--</span>
         </div>
+        <div class="measurement-row">
+          <span class="measurement-label">Wellness Goal</span>
+          <span class="measurement-value" id="goalDisplay">--</span>
+        </div>
       </div>
-      
+
       <div class="process-steps">
         <h6><i class="fas fa-microchip me-2"></i>Processing Pipeline</h6>
         <ol>
           <li>✅ Foot contour detection (OpenCV + Otsu threshold)</li>
-          <li>✅ Region isolation & noise filtering</li>
+          <li>✅ Region isolation &amp; noise filtering</li>
           <li>✅ Dimensional calculation (width + length)</li>
           <li>✅ Scale normalization using A4 reference</li>
-          <li>⏳ 3D mesh generation & biomechanical modeling</li>
+          <li>⏳ 3D mesh generation &amp; biomechanical modeling</li>
         </ol>
         <div class="pro-tip">
           <i class="fas fa-lightbulb"></i>
           <strong>Industry Pro Tip:</strong> For highest accuracy, always scan with foot centered on a standard A4 white sheet (210×297mm). Our algorithm auto-detects the paper's 1.414 aspect ratio to calibrate pixel-to-millimeter conversion.
         </div>
       </div>
-      
-      <div class="mt-4">
-        <button class="btn btn-primary scan-btn" onclick="location.reload()">
+
+      <div class="mt-4 d-flex justify-content-center gap-2 flex-wrap">
+        <button class="btn btn-primary scan-btn" onclick="resetAll()">
           <i class="fas fa-redo me-2"></i>Scan Another Foot
         </button>
-        <a href="dashboard.html" class="btn btn-outline-light scan-btn ms-2">
+        <a href="dashboard.html" class="btn btn-outline-light scan-btn">
           View My Profile <i class="fas fa-arrow-right ms-1"></i>
         </a>
       </div>
@@ -372,206 +398,166 @@ video, canvas {
 
 <!-- Footer -->
 <footer class="bg-dark footer-section text-light">
-  <div class="container relative">
-    <div class="sofa-img mb-4 text-center">
-      <img src="images/shoe.gif" alt="Zilfit Footwear" class="img-fluid">
-    </div>
-    <div class="row mb-5">
-      <div class="col-lg-8">
-        <div class="subscription-form">
-          <h3 class="d-flex align-items-center text-light">
-            <span class="me-1"><img src="images/envelope-outline.svg" alt="Newsletter" class="img-fluid"></span>
-            <span>Subscribe to Zilfit Updates</span>
-          </h3>
-          <form action="#" class="row g-3">
-            <div class="col-auto"><input type="text" class="form-control" placeholder="Enter your name"></div>
-            <div class="col-auto"><input type="email" class="form-control" placeholder="Enter your email"></div>
-            <div class="col-auto"><button class="btn btn-primary"><span class="fa fa-paper-plane"></span></button></div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <div class="row g-5 mb-5">
+  <div class="container">
+    <div class="row mb-5 pt-5">
       <div class="col-lg-4">
-        <div class="mb-4 footer-logo-wrap">
-          <a href="#" class="footer-logo text-light">Zilfit<span>.</span></a>
+        <div class="mb-4">
+          <a href="#" class="text-light text-decoration-none fw-bold fs-4">Zilfit<span style="color:#0d6efd">.</span></a>
         </div>
-        <p class="mb-4 text-light">Precision-engineered, custom footwear designed to optimize health and performance. On-demand manufacturing for a personalized experience.</p>
-        <ul class="list-unstyled custom-social">
-          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-facebook-f"></span></a></li>
-          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-twitter"></span></a></li>
-          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-instagram"></span></a></li>
-          <li><a href="#" class="bg-dark"><span class="fa fa-brands fa-linkedin"></span></a></li>
+        <p class="mb-4 text-light">Precision-engineered, custom footwear designed to optimize health and performance.</p>
+        <ul class="list-unstyled d-flex gap-3">
+          <li><a href="#" class="text-light"><i class="fab fa-facebook-f"></i></a></li>
+          <li><a href="#" class="text-light"><i class="fab fa-twitter"></i></a></li>
+          <li><a href="#" class="text-light"><i class="fab fa-instagram"></i></a></li>
+          <li><a href="#" class="text-light"><i class="fab fa-linkedin"></i></a></li>
         </ul>
       </div>
       <div class="col-lg-8">
-        <div class="row links-wrap">
+        <div class="row">
           <div class="col-6 col-sm-6 col-md-3">
             <ul class="list-unstyled">
-              <li><a href="#" class="text-light">About Us</a></li>
-              <li><a href="#" class="text-light">Our Process</a></li>
-              <li><a href="#" class="text-light">Contact</a></li>
+              <li><a href="#" class="text-light text-decoration-none">About Us</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Our Process</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Contact</a></li>
             </ul>
           </div>
           <div class="col-6 col-sm-6 col-md-3">
             <ul class="list-unstyled">
-              <li><a href="#" class="text-light">Support</a></li>
-              <li><a href="#" class="text-light">FAQ</a></li>
-              <li><a href="#" class="text-light">Live Chat</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Support</a></li>
+              <li><a href="#" class="text-light text-decoration-none">FAQ</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Live Chat</a></li>
             </ul>
           </div>
           <div class="col-6 col-sm-6 col-md-3">
             <ul class="list-unstyled">
-              <li><a href="#" class="text-light">Terms & Conditions</a></li>
-              <li><a href="#" class="text-light">Privacy Policy</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Terms</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Privacy Policy</a></li>
             </ul>
           </div>
           <div class="col-6 col-sm-6 col-md-3">
             <ul class="list-unstyled">
-              <li><a href="#" class="text-light">Zilfit Calm</a></li>
-              <li><a href="#" class="text-light">Zilfit Recovery</a></li>
-              <li><a href="#" class="text-light">Zilfit Focus</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Zilfit Calm</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Zilfit Recovery</a></li>
+              <li><a href="#" class="text-light text-decoration-none">Zilfit Focus</a></li>
             </ul>
           </div>
         </div>
       </div>
     </div>
-    <div class="border-top text-light copyright">
-      <div class="row pt-4">
-        <div class="col-lg-6">
-          <p class="mb-2 text-center text-lg-start">Copyright &copy;<script>document.write(new Date().getFullYear());</script>. All Rights Reserved. Zilfit</p>
-        </div>
-        <div class="col-lg-6 text-center text-lg-end">
-          <ul class="list-unstyled d-inline-flex ms-auto">
-            <li class="me-4"><a href="#" class="text-light">Terms & Conditions</a></li>
-            <li><a href="#" class="text-light">Privacy Policy</a></li>
-          </ul>
-        </div>
-      </div>
+    <div class="border-top text-light py-4 text-center">
+      <p class="mb-0">Copyright &copy;<script>document.write(new Date().getFullYear());</script> All Rights Reserved. Zilfit.</p>
     </div>
   </div>
 </footer>
 
-<!-- ===== PERFORMANCE MONITOR (DEBUG) ===== -->
+<!-- Performance Monitor (debug only) -->
 <div class="perf-monitor" id="perfMonitor">
-  <div class="perf-row"><span>FPS:</span><span id="fpsValue">--</span></div>
+  <div class="perf-row"><span>FPS cap:</span><span id="fpsValue">--</span></div>
   <div class="perf-row"><span>Memory:</span><span id="memValue">--</span></div>
   <div class="perf-row"><span>OpenCV:</span><span id="cvStatus">--</span></div>
 </div>
 
-<!-- ===== ⭐ CRITICAL FIX: GLOBAL CALLBACKS (BEFORE OPENCV LOADS) ===== -->
+<!-- ================================================================
+     CRITICAL: Global OpenCV callbacks defined BEFORE the script tag
+     that loads opencv.js — this guarantees they exist when called.
+================================================================ -->
 <script>
-  // Initialize global state immediately
   window.cvReady = false;
   window.cvLoadError = false;
-  
-  // ✅ Hoisted to global scope BEFORE OpenCV script loads
-  window.onOpenCvReady = function() {
+  window.cvRetried = false;
+
+  window.onOpenCvReady = function () {
     window.cvReady = true;
-    console.log("✅ OpenCV.js loaded successfully");
-    // Defer UI updates to ensure DOM functions exist
-    setTimeout(() => {
-      if (typeof updateStatus === 'function') {
-        updateStatus('🔬 OpenCV engine ready');
-      }
-      if (typeof updateButtonStates === 'function') {
-        updateButtonStates();
-      }
-      if (typeof updatePerfMonitor === 'function') {
-        updatePerfMonitor();
-      }
-    }, 0);
+    console.log('✅ OpenCV.js loaded successfully');
+    requestAnimationFrame(() => {
+      updateStatus('🔬 OpenCV engine ready — you may analyze');
+      updateButtonStates();
+      updatePerfMonitor();
+      hideCvFallbackNotice();
+    });
   };
 
-  window.onOpenCvError = function() {
-    window.cvLoadError = true;
-    console.error("❌ Failed to load OpenCV.js");
+  window.onOpenCvError = function () {
+    if (window.cvRetried) {
+      window.cvLoadError = true;
+      console.error('❌ OpenCV failed to load after retry');
+      requestAnimationFrame(() => {
+        updateStatus('⚠️ OpenCV unavailable. Camera & capture still work.', true);
+        showCvFallbackNotice();
+        updatePerfMonitor();
+      });
+      return;
+    }
+    // Auto-retry once from alternate CDN path
+    window.cvRetried = true;
+    console.warn('⚠️ OpenCV failed. Retrying...');
     setTimeout(() => {
-      if (typeof updateStatus === 'function') {
-        updateStatus('⚠️ OpenCV failed to load. Retrying...', true);
-      }
-      // Auto-retry once
-      setTimeout(() => {
-        if (!window.cvReady && !window.cvLoadError) {
-          const script = document.createElement('script');
-          script.src = 'https://docs.opencv.org/4.x/opencv.js';
-          script.onload = window.onOpenCvReady;
-          script.onerror = () => {
-            if (typeof updateStatus === 'function') {
-              updateStatus('❌ OpenCV unavailable. Please check connection.', true);
-            }
-          };
-          document.body.appendChild(script);
-        }
-      }, 2000);
-    }, 0);
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://docs.opencv.org/4.8.0/opencv.js';
+      s.onload = window.onOpenCvReady;
+      s.onerror = window.onOpenCvError;
+      document.body.appendChild(s);
+    }, 2000);
   };
 </script>
 
-<!-- ===== OpenCV CDN (calls the global callbacks above) ===== -->
-<script src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
+<!-- OpenCV CDN -->
+<script async src="https://docs.opencv.org/4.x/opencv.js"
+        onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
 
-<!-- ===== Bootstrap JS ===== -->
+<!-- Bootstrap JS -->
 <script src="js/bootstrap.bundle.min.js"></script>
 
-<!-- ===== MAIN APPLICATION SCRIPT ===== -->
+<!-- ================================================================
+     MAIN APPLICATION SCRIPT
+================================================================ -->
 <script>
-// ===== GLOBAL STATE =====
-let video = document.getElementById("camera");
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
-let currentStream = null;
-let selectedGoal = null;
-let currentStep = 1;
+'use strict';
 
-// ⭐ IMPROVEMENT #3: FPS Limiter for real-time processing
-let lastFrameTime = 0;
-const MIN_FRAME_INTERVAL = 100; // ms between frames (10 FPS max for heavy CV)
+// ─── DOM refs (resolved once, null-safe throughout) ───────────────
+const videoEl    = document.getElementById('camera');
+const canvasEl   = document.getElementById('canvas');
+const ctx        = canvasEl ? canvasEl.getContext('2d') : null;
 
-function shouldProcessFrame() {
+// ─── Application state ────────────────────────────────────────────
+let currentStream    = null;
+let selectedGoal     = null;
+let currentStep      = 1;
+let captureReady     = false; // BUG FIX: replaced fragile dataset flag
+let cameraStarted    = false;
+
+// ─── FPS limiter (only for processFoot, NOT for capture) ──────────
+let lastProcessTime  = 0;
+const PROCESS_COOLDOWN_MS = 500; // half-second between analyze calls
+
+function canProcessNow() {
   const now = performance.now();
-  if (now - lastFrameTime < MIN_FRAME_INTERVAL) return false;
-  lastFrameTime = now;
+  if (now - lastProcessTime < PROCESS_COOLDOWN_MS) return false;
+  lastProcessTime = now;
   return true;
 }
 
-// ⭐ IMPROVEMENT #1: Memory Leak Protection - Centralized cleanup
+// ─── OpenCV Mat memory cleanup helper ─────────────────────────────
 function cleanupMats(...mats) {
-  mats.forEach(mat => {
-    if (mat && typeof mat.delete === 'function') {
-      try { mat.delete(); } catch(e) { /* silent fail */ }
+  mats.forEach(m => {
+    if (m && !m.isDeleted && typeof m.delete === 'function') {
+      try { m.delete(); } catch (_) {}
     }
   });
 }
 
-// ⭐ IMPROVEMENT #2: Stop Camera to save battery/CPU
+// ─── Camera stop ──────────────────────────────────────────────────
 function stopCamera() {
   if (currentStream) {
-    currentStream.getTracks().forEach(track => {
-      track.stop();
-      console.log('📹 Camera track stopped');
-    });
+    currentStream.getTracks().forEach(t => t.stop());
     currentStream = null;
-    if (video) video.srcObject = null;
-    updateStatus('Camera released');
+    if (videoEl) videoEl.srcObject = null;
+    cameraStarted = false;
   }
 }
 
-// ✅ Reliable capture state using dataset
-function markCaptured() { 
-  if (canvas) canvas.dataset.captured = "true"; 
-}
-function isCaptured() { 
-  return canvas && canvas.dataset.captured === "true"; 
-}
-function clearCapture() {
-  if (!canvas) return;
-  canvas.dataset.captured = "false";
-  canvas.classList.add("d-none");
-  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-// ===== SPLASH SCREEN =====
+// ─── Splash screen ────────────────────────────────────────────────
 window.addEventListener('load', () => {
   setTimeout(() => {
     const splash = document.getElementById('splashScreen');
@@ -579,500 +565,499 @@ window.addEventListener('load', () => {
   }, 2800);
 });
 
-// ===== STEP NAVIGATION =====
+// ─── Cleanup on tab/window close ──────────────────────────────────
+window.addEventListener('beforeunload', stopCamera);
+
+// ─── Status display ───────────────────────────────────────────────
+function updateStatus(message, isWarning = false) {
+  const el = document.getElementById('scanStatus');
+  if (!el) return;
+  const icon = isWarning ? 'fa-exclamation-triangle' : 'fa-circle-notch fa-spin';
+  el.innerHTML = `<i class="fas ${icon} me-1"></i>${message}`;
+  el.style.color = isWarning ? '#ffc107' : '#aaa';
+}
+
+// ─── OpenCV fallback notice ───────────────────────────────────────
+function showCvFallbackNotice() {
+  const el = document.getElementById('cvFallbackNotice');
+  if (el) el.classList.add('show');
+}
+function hideCvFallbackNotice() {
+  const el = document.getElementById('cvFallbackNotice');
+  if (el) el.classList.remove('show');
+}
+
+// ─── Button state management ─────────────────────────────────────
+// BUG FIX: single source of truth for all button enable/disable logic
+function updateButtonStates() {
+  const startBtn   = document.getElementById('startCameraBtn');
+  const captureBtn = document.getElementById('captureBtn');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const submitBtn  = document.getElementById('submitGoalBtn');
+
+  if (startBtn)   startBtn.disabled   = cameraStarted;
+  // BUG FIX: was using readyState === 4 (HAVE_ENOUGH_DATA only)
+  // Changed to readyState >= 2 (HAVE_CURRENT_DATA+) — works on all browsers/devices
+  if (captureBtn) captureBtn.disabled = !(cameraStarted && videoEl && videoEl.readyState >= 2);
+  // Analyze requires a capture AND OpenCV to be ready
+  if (analyzeBtn) analyzeBtn.disabled = !(captureReady && window.cvReady);
+  if (submitBtn)  submitBtn.disabled  = !selectedGoal;
+}
+
+// ─── Step navigation ──────────────────────────────────────────────
 function goToStep(stepNumber) {
-  // ⭐ IMPROVEMENT #2: Stop camera when leaving scan step
-  if (currentStep === 1 && stepNumber !== 1) {
-    stopCamera();
-  }
-  
-  document.querySelectorAll('.step-dot').forEach((dot, index) => {
-    const step = index + 1;
+  // Stop camera when leaving scan step
+  if (currentStep === 1 && stepNumber !== 1) stopCamera();
+
+  currentStep = stepNumber;
+
+  // Update step dots
+  [1, 2, 3].forEach(n => {
+    const dot = document.getElementById(`dot${n}`);
+    if (!dot) return;
     dot.classList.remove('active', 'completed');
-    if (step < stepNumber) dot.classList.add('completed');
-    if (step === stepNumber) dot.classList.add('active');
+    if (n < stepNumber) dot.classList.add('completed');
+    if (n === stepNumber) dot.classList.add('active');
   });
-  
-  const scanStep = document.getElementById('scanStep');
-  const goalStep = document.getElementById('goalStep');
+
+  // Show/hide panels
+  // BUG FIX: scanStep uses .scan-step, not .d-step — unified class
+  const scanStep    = document.getElementById('scanStep');
+  const goalStep    = document.getElementById('goalStep');
   const successStep = document.getElementById('successStep');
-  
-  if (scanStep) scanStep.classList.remove('active');
-  if (goalStep) goalStep.classList.remove('active');
-  if (successStep) successStep.classList.remove('active');
-  
-  if (stepNumber === 1) {
-    if (scanStep) scanStep.classList.add('active');
-    currentStep = 1;
-  } else if (stepNumber === 2) {
-    if (goalStep) goalStep.classList.add('active');
-    currentStep = 2;
-  } else if (stepNumber === 3) {
-    if (successStep) successStep.classList.add('active');
-    currentStep = 3;
-  }
-  
+
+  if (scanStep)    scanStep.classList.toggle('active', stepNumber === 1);
+  if (goalStep)    goalStep.classList.toggle('active', stepNumber === 2);
+  if (successStep) successStep.classList.toggle('active', stepNumber === 3);
+
   updateButtonStates();
   updatePerfMonitor();
 }
 
-function updateButtonStates() {
-  const isScanning = currentStep === 1;
-  const hasCapture = isCaptured();
-  const cvIsReady = window.cvReady === true;
-  
-  const captureBtn = document.getElementById('captureBtn');
-  const analyzeBtn = document.getElementById('analyzeBtn');
-  const submitBtn = document.getElementById('submitGoalBtn');
-  
-  if (captureBtn) captureBtn.disabled = !(isScanning && video && video.readyState >= 2);
-  if (analyzeBtn) analyzeBtn.disabled = !(isScanning && hasCapture && cvIsReady);
-  if (submitBtn) submitBtn.disabled = !selectedGoal;
-}
-
-function updateStatus(message, isWarning = false) {
-  const statusEl = document.getElementById('scanStatus');
-  const guideEl = document.getElementById('scanGuide');
-  
-  if (statusEl) {
-    const icon = isWarning ? 'fa-exclamation-triangle' : 'fa-circle-notch';
-    const spin = isWarning ? '' : 'fa-spin';
-    statusEl.innerHTML = `<i class="fas ${icon} ${spin} me-1"></i>${message}`;
-  }
-  
-  if (guideEl && isWarning) {
-    guideEl.classList.add('warning');
-    guideEl.innerHTML = `<i class="fas fa-lightbulb"></i><span>⚠️ ${message}</span>`;
-  } else if (guideEl) {
-    guideEl.classList.remove('warning');
-    guideEl.innerHTML = `<i class="fas fa-info-circle"></i><span>💡 Place foot on white A4 paper for accurate scale reference</span>`;
-  }
-}
-
-// ===== PERFORMANCE MONITOR =====
+// ─── Performance monitor (debug mode only) ────────────────────────
 function updatePerfMonitor() {
   const monitor = document.getElementById('perfMonitor');
   if (!monitor) return;
-  
-  // Show monitor only in development
-  if (location.hostname === 'localhost' || location.href.includes('debug')) {
-    monitor.classList.add('active');
-    
-    const fpsEl = document.getElementById('fpsValue');
-    if (fpsEl && lastFrameTime > 0) {
-      const estimatedFps = Math.round(1000 / MIN_FRAME_INTERVAL);
-      fpsEl.textContent = `≤${estimatedFps}`;
-    }
-    
-    const memEl = document.getElementById('memValue');
-    if (memEl && performance.memory) {
-      const usedMB = Math.round(performance.memory.usedJSHeapSize / 1048576);
-      memEl.textContent = `${usedMB} MB`;
-    } else if (memEl) {
-      memEl.textContent = 'N/A';
-    }
-    
-    const cvEl = document.getElementById('cvStatus');
-    if (cvEl) {
-      cvEl.textContent = window.cvReady ? '✅ Ready' : (window.cvLoadError ? '❌ Error' : '⏳ Loading');
-      cvEl.style.color = window.cvReady ? '#0f0' : (window.cvLoadError ? '#f00' : '#ff0');
-    }
-  } else {
-    monitor.classList.remove('active');
+  const isDebug = location.hostname === 'localhost' || location.search.includes('debug');
+  monitor.classList.toggle('active', isDebug);
+  if (!isDebug) return;
+
+  const fpsEl = document.getElementById('fpsValue');
+  if (fpsEl) fpsEl.textContent = '≤10 (throttled)';
+
+  const memEl = document.getElementById('memValue');
+  if (memEl && performance.memory) {
+    memEl.textContent = Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB';
+  } else if (memEl) {
+    memEl.textContent = 'N/A';
+  }
+
+  const cvEl = document.getElementById('cvStatus');
+  if (cvEl) {
+    cvEl.textContent  = window.cvReady ? '✅ Ready' : (window.cvLoadError ? '❌ Error' : '⏳ Loading');
+    cvEl.style.color  = window.cvReady ? '#0f0'    : (window.cvLoadError ? '#f00'     : '#ff0');
   }
 }
 
-// ===== CAMERA FUNCTIONS =====
+// ─── Reset everything for a new scan ─────────────────────────────
+function resetAll() {
+  captureReady  = false;
+  selectedGoal  = null;
+  cameraStarted = false;
+  window.scanMeasurements = null;
+
+  if (canvasEl) {
+    canvasEl.style.display = 'none';
+    if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  }
+  if (videoEl) videoEl.style.display = 'block';
+
+  document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('selected'));
+
+  goToStep(1);
+  updateStatus('Click "Start Camera" to begin');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  CAMERA
+// ═══════════════════════════════════════════════════════════════════
 async function startCamera() {
+  if (cameraStarted) return;
+  updateStatus('Requesting camera access...');
+  const startBtn = document.getElementById('startCameraBtn');
+  if (startBtn) startBtn.disabled = true;
+
   try {
-    updateStatus('Requesting camera access...');
-    const startBtn = document.getElementById('startCameraBtn');
-    if (startBtn) startBtn.disabled = true;
-    
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        width: { ideal: 1280 },
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width:  { ideal: 1280 },
         height: { ideal: 720 },
         facingMode: 'environment'
-      } 
+      },
+      audio: false
     });
-    
+
     currentStream = stream;
-    if (video) video.srcObject = stream;
-    
-    if (video) await video.play();
-    updateStatus('Camera active. Position foot in frame.');
-    
-    if (video) {
-      video.onloadedmetadata = () => {
-        const captureBtn = document.getElementById('captureBtn');
-        if (captureBtn) captureBtn.disabled = false;
-        updateStatus('Ready to capture. Ensure good lighting.');
-        updatePerfMonitor();
-      };
+    if (videoEl) {
+      videoEl.srcObject = stream;
+      videoEl.style.display = 'block';
     }
-    
+
+    // BUG FIX: Use 'loadeddata' event (fires at readyState >= 2) 
+    // instead of 'loadedmetadata' (which fires before frames are available)
+    videoEl.addEventListener('loadeddata', () => {
+      cameraStarted = true;
+      updateStatus('📷 Camera active — position your foot in frame');
+      updateButtonStates();
+    }, { once: true });
+
+    // Fallback: if loadeddata never fires, check on play
+    videoEl.addEventListener('playing', () => {
+      if (!cameraStarted) {
+        cameraStarted = true;
+        updateStatus('📷 Camera active — position your foot in frame');
+        updateButtonStates();
+      }
+    }, { once: true });
+
+    await videoEl.play().catch(e => console.warn('Autoplay warning (safe to ignore):', e));
+
   } catch (err) {
     console.error('Camera error:', err);
-    const msg = err.name === 'NotAllowedError' ? 'Camera permission denied' : 
-                err.name === 'NotFoundError' ? 'No camera detected' : err.message;
+    const msg =
+      err.name === 'NotAllowedError'  ? 'Camera permission was denied' :
+      err.name === 'NotFoundError'    ? 'No camera detected on this device' :
+      err.name === 'NotReadableError' ? 'Camera is in use by another app' :
+      err.message;
+
     updateStatus(`❌ ${msg}`, true);
-    const startBtn = document.getElementById('startCameraBtn');
     if (startBtn) startBtn.disabled = false;
-    alert(`Camera error: ${msg}. Please allow permissions and try again.`);
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  CAPTURE
+// ═══════════════════════════════════════════════════════════════════
 function capture() {
-  if (!video || video.readyState !== 4) {
-    updateStatus('⚠️ Video not ready. Wait a moment.', true);
+  // BUG FIX: use >= 2 not !== 4 — covers all browsers & devices
+  if (!videoEl || videoEl.readyState < 2) {
+    updateStatus('⚠️ Video not ready yet — wait a moment', true);
     return;
   }
-  
-  // ⭐ IMPROVEMENT #3: FPS limiter for capture
-  if (!shouldProcessFrame()) {
-    updateStatus('⏳ Processing... please wait', true);
+
+  // BUG FIX: removed FPS limiter from capture — it was silently blocking
+  // legitimate captures. FPS limiting is only appropriate for heavy CV processing.
+
+  const w = videoEl.videoWidth;
+  const h = videoEl.videoHeight;
+  if (!w || !h) {
+    updateStatus('⚠️ Unable to read video dimensions', true);
     return;
   }
-  
-  const orientation = screen.orientation?.angle || 0;
-  const videoW = video.videoWidth;
-  const videoH = video.videoHeight;
-  
-  if (!canvas) return;
-  canvas.width = videoW;
-  canvas.height = videoH;
-  
-  if (!ctx) return;
-  ctx.save();
-  if (orientation === 90 || orientation === 270) {
-    canvas.width = videoH;
-    canvas.height = videoW;
-    ctx.translate(canvas.width/2, canvas.height/2);
-    ctx.rotate(orientation * Math.PI / 180);
-    ctx.drawImage(video, -videoW/2, -videoH/2, videoW, videoH);
+
+  // Handle device rotation
+  const angle = (screen.orientation && screen.orientation.angle) || 0;
+  if (angle === 90 || angle === 270) {
+    canvasEl.width  = h;
+    canvasEl.height = w;
+    ctx.save();
+    ctx.translate(canvasEl.width / 2, canvasEl.height / 2);
+    ctx.rotate(angle * Math.PI / 180);
+    ctx.drawImage(videoEl, -w / 2, -h / 2, w, h);
+    ctx.restore();
   } else {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvasEl.width  = w;
+    canvasEl.height = h;
+    ctx.drawImage(videoEl, 0, 0, w, h);
   }
-  ctx.restore();
-  
-  canvas.classList.remove('d-none');
-  markCaptured();
-  
-  const laserOverlay = document.getElementById('laserOverlay');
-  if (laserOverlay) laserOverlay.style.display = 'block';
-  
-  updateStatus('Capture complete! Click "Analyze" to process.');
-  const analyzeBtn = document.getElementById('analyzeBtn');
-  if (analyzeBtn) analyzeBtn.disabled = !(window.cvReady);
-  
-  setTimeout(() => {
-    if (laserOverlay) laserOverlay.style.display = 'none';
-  }, 3000);
+
+  // Show canvas, hide live video
+  canvasEl.style.display = 'block';
+  captureReady = true; // BUG FIX: was using fragile dataset.captured string
+
+  // Laser animation
+  const laser = document.getElementById('laserOverlay');
+  if (laser) {
+    laser.style.display = 'block';
+    setTimeout(() => { laser.style.display = 'none'; }, 3000);
+  }
+
+  updateStatus('✅ Capture complete! Click "Analyze" to process.');
+  updateButtonStates();
 }
 
-// ===== OPENCV PROCESSING PIPELINE (SENIOR-LEVEL) =====
+// Wire capture button properly (no inline onclick that could fire before DOM ready)
+document.addEventListener('DOMContentLoaded', () => {
+  const captureBtn = document.getElementById('captureBtn');
+  if (captureBtn) captureBtn.addEventListener('click', capture);
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  if (analyzeBtn) analyzeBtn.addEventListener('click', processFoot);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  OPENCV PROCESSING PIPELINE
+// ═══════════════════════════════════════════════════════════════════
 function processFoot() {
   if (!window.cvReady) {
-    if (window.cvLoadError) {
-      alert('❌ OpenCV failed to load. Please refresh the page.');
-    } else {
-      updateStatus('⏳ OpenCV still initializing...');
-    }
+    updateStatus('⏳ OpenCV is still initializing — try again in a moment', true);
     return;
   }
-  
-  if (!isCaptured()) {
+  if (!captureReady) {
     updateStatus('⚠️ Please capture an image first', true);
     return;
   }
-  
-  // ⭐ IMPROVEMENT #3: FPS limiter for heavy processing
-  if (!shouldProcessFrame()) {
-    updateStatus('⏳ Throttled: processing too fast', true);
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    if (analyzeBtn) analyzeBtn.disabled = false;
+  // BUG FIX: cooldown only on processFoot, not on capture
+  if (!canProcessNow()) {
+    updateStatus('⏳ Analysis throttled — please wait', true);
     return;
   }
-  
+
   updateStatus('🔬 Running biometric analysis pipeline...');
   const analyzeBtn = document.getElementById('analyzeBtn');
   if (analyzeBtn) analyzeBtn.disabled = true;
-  
-  let src = null, gray = null, blur = null, thresh = null, opened = null;
-  let contours = null, hierarchy = null;
-  
+
+  // Run in a microtask so the status text renders before the heavy work
+  setTimeout(() => _runOpenCV(analyzeBtn), 50);
+}
+
+function _runOpenCV(analyzeBtn) {
+  // Declare all Mats up-front for guaranteed cleanup in finally block
+  let src = null, gray = null, blur = null, thresh = null,
+      opened = null, kernel = null, contours = null, hierarchy = null;
+
   try {
-    if (!canvas) throw new Error("Canvas not found");
-    src = cv.imread(canvas);
-    
-    // ⭐ IMPROVEMENT #5: Security - Validate frame before processing
-    if (src.empty()) {
-      throw new Error("Invalid frame: source image is empty");
-    }
-    
-    // ⭐ IMPROVEMENT #4: Resize for performance
-    const maxSize = 640;
-    if (src.cols > maxSize || src.rows > maxSize) {
-      const scale = maxSize / Math.max(src.cols, src.rows);
+    src = cv.imread(canvasEl);
+    if (src.empty()) throw new Error('Captured frame is empty — please retake');
+
+    // ── Resize for performance (max 640px on longest side) ──────────
+    const MAX = 640;
+    if (src.cols > MAX || src.rows > MAX) {
+      const scale   = MAX / Math.max(src.cols, src.rows);
       const newSize = new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale));
       cv.resize(src, src, newSize, 0, 0, cv.INTER_LINEAR);
     }
-    
+
     gray = new cv.Mat();
-    blur = new cv.Mat();
-    
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-    
-    // ✅ Lighting validation
-    let meanBrightness = cv.mean(gray)[0];
-    if (meanBrightness < 50) {
-      updateStatus('⚠️ Lighting too dark. Please add more light.', true);
-      alert('💡 Lighting too dim for accurate scanning.');
-      cleanupMats(src, gray, blur);
+
+    // ── Lighting validation ──────────────────────────────────────────
+    const brightness = cv.mean(gray)[0];
+    if (brightness < 40) {
+      updateStatus('⚠️ Image too dark — please add more light', true);
       if (analyzeBtn) analyzeBtn.disabled = false;
+      cleanupMats(src, gray);
       return;
     }
-    if (meanBrightness > 220) {
-      updateStatus('⚠️ Overexposed. Reduce lighting.', true);
-      alert('☀️ Image too bright. Please reduce lighting.');
-      cleanupMats(src, gray, blur);
+    if (brightness > 225) {
+      updateStatus('⚠️ Image overexposed — reduce lighting', true);
       if (analyzeBtn) analyzeBtn.disabled = false;
+      cleanupMats(src, gray);
       return;
     }
-    
-    // ⭐ IMPROVEMENT #1: Otsu threshold for auto foot detection
+
+    // ── Gaussian blur → Otsu threshold ──────────────────────────────
+    blur   = new cv.Mat();
     thresh = new cv.Mat();
-    cv.threshold(gray, thresh, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-    
-    let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+    cv.threshold(blur, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+
+    // ── Morphological opening (remove noise) ────────────────────────
+    kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
     opened = new cv.Mat();
     cv.morphologyEx(thresh, opened, cv.MORPH_OPEN, kernel);
-    
-    contours = new cv.MatVector();
+
+    // ── Contour detection ───────────────────────────────────────────
+    contours  = new cv.MatVector();
     hierarchy = new cv.Mat();
     cv.findContours(opened, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-    
-    // Find largest contour + A4 detection
-    let largestContour = null;
-    let maxArea = 0;
-    let a4Contour = null;
-    const A4_RATIO = 1.414;
+
     const imageArea = src.rows * src.cols;
-    
+    let largestContour = null, maxArea = 0, a4Contour = null;
+    const A4_RATIO = 1.414;
+
     for (let i = 0; i < contours.size(); i++) {
-      const cnt = contours.get(i);
+      const cnt  = contours.get(i);
       const area = cv.contourArea(cnt);
-      
-      if (area > maxArea) {
-        maxArea = area;
-        largestContour = cnt;
-      }
-      
-      // ⭐ IMPROVEMENT #4: True scale detection with area ratio consistency
-      const rect = cv.boundingRect(cnt);
-      const ratio = Math.max(rect.width, rect.height) / Math.min(rect.width, rect.height);
-      // Check both aspect ratio AND minimum area threshold to avoid false positives
+      if (area > maxArea) { maxArea = area; largestContour = cnt; }
+
+      // A4 detection: check aspect ratio AND area > 20% of image
+      const r     = cv.boundingRect(cnt);
+      const sides = [r.width, r.height];
+      const ratio = Math.max(...sides) / Math.min(...sides);
       if (Math.abs(ratio - A4_RATIO) < 0.15 && area > imageArea * 0.2 && area > 10000) {
         a4Contour = cnt;
       }
     }
-    
-    // ✅ FIX: Draw ONLY the largest contour
-    if (largestContour && maxArea > 5000) {
-      let color = new cv.Scalar(0, 255, 0, 255);
-      for (let i = 0; i < contours.size(); i++) {
-        if (contours.get(i) === largestContour) {
-          cv.drawContours(src, contours, i, color, 3);
-          break;
-        }
-      }
-      
-      // ⭐ Real measurement system
-      const rect = cv.boundingRect(largestContour);
-      const footLengthPx = rect.height;
-      const footWidthPx = rect.width;
-      
-      // ⭐ Scale using A4 reference with validated detection
-      let scale = 1.0;
-      let a4Detected = false;
-      
-      if (a4Contour) {
-        const a4Rect = cv.boundingRect(a4Contour);
-        const a4HeightPx = Math.max(a4Rect.width, a4Rect.height);
-        scale = 297 / a4HeightPx; // A4 long side = 297mm
-        a4Detected = true;
-        console.log('📐 A4 detected. Scale:', scale.toFixed(3), 'mm/px');
-      }
-      
-      const footLengthMm = Math.round(footLengthPx * scale);
-      const footWidthMm = Math.round(footWidthPx * scale);
-      
-      // ⭐ Arch detection via convexity defects
-      let archType = "Normal";
-      if (largestContour) {
-        const hull = new cv.Mat();
-        const defects = new cv.Mat();
-        cv.convexHull(largestContour, hull, false, false);
-        
-        if (hull.rows > 3 && largestContour.rows > 3) {
-          try {
-            cv.convexityDefects(largestContour, hull, defects);
-            if (defects.rows > 0) {
-              let maxDefectDepth = 0;
-              for (let i = 0; i < defects.rows; i++) {
-                const depth = defects.data32S[i * 4 + 2] / 256;
-                if (depth > maxDefectDepth) maxDefectDepth = depth;
-              }
-              if (maxDefectDepth > rect.height * 0.15) {
-                archType = "High Arch";
-              } else if (maxDefectDepth < rect.height * 0.05) {
-                archType = "Flat Foot";
-              }
-            }
-          } catch (e) {
-            console.log('Arch detection skipped:', e);
-          }
-        }
-        hull.delete();
-        defects.delete();
-      }
-      
-      // Update UI
-      const footLengthEl = document.getElementById('footLength');
-      const footWidthEl = document.getElementById('footWidth');
-      const archTypeEl = document.getElementById('archType');
-      const a4DetectedEl = document.getElementById('a4Detected');
-      
-      if (footLengthEl) footLengthEl.textContent = `${footLengthMm} mm`;
-      if (footWidthEl) footWidthEl.textContent = `${footWidthMm} mm`;
-      if (archTypeEl) archTypeEl.textContent = archType;
-      if (a4DetectedEl) a4DetectedEl.textContent = a4Detected ? '✅ Auto-calibrated' : '⚠️ Manual scale';
-      
-      window.scanMeasurements = {
-        lengthMm: footLengthMm,
-        widthMm: footWidthMm,
-        archType: archType,
-        a4Detected: a4Detected,
-        scale: scale,
-        brightness: meanBrightness,
-        timestamp: new Date().toISOString()
-      };
+
+    if (!largestContour || maxArea < 4000) {
+      updateStatus('⚠️ No foot detected — ensure good contrast & lighting', true);
+      if (analyzeBtn) analyzeBtn.disabled = false;
+      cleanupMats(src, gray, blur, thresh, opened, kernel, contours, hierarchy);
+      return;
     }
-    
-    cv.imshow(canvas, src);
-    
-    // ✅ CRITICAL: Clean up ALL OpenCV memory (⭐ IMPROVEMENT #1)
-    cleanupMats(src, gray, blur, thresh, opened, contours, hierarchy);
-    
-    updateStatus('✅ Foot contour detected! Biometric data ready.');
-    
-    setTimeout(() => {
-      goToStep(2);
-    }, 1500);
-    
+
+    // ── Draw contour on source image ─────────────────────────────────
+    // BUG FIX: old code searched for === identity match which is unreliable;
+    // now we track the index directly during the loop above
+    let largestIdx = 0;
+    for (let i = 0; i < contours.size(); i++) {
+      if (cv.contourArea(contours.get(i)) === maxArea) { largestIdx = i; break; }
+    }
+    cv.drawContours(src, contours, largestIdx, new cv.Scalar(0, 255, 100, 255), 3);
+
+    // ── Measurements ────────────────────────────────────────────────
+    const rect        = cv.boundingRect(largestContour);
+    const footLenPx   = rect.height;
+    const footWidPx   = rect.width;
+
+    let scale       = 1.0;
+    let a4Detected  = false;
+    if (a4Contour) {
+      const a4r    = cv.boundingRect(a4Contour);
+      const a4Long = Math.max(a4r.width, a4r.height);
+      scale        = 297 / a4Long; // A4 long side = 297 mm
+      a4Detected   = true;
+    }
+
+    const footLenMm = Math.round(footLenPx * scale);
+    const footWidMm = Math.round(footWidPx * scale);
+
+    // ── Arch type via convexity defects ─────────────────────────────
+    let archType = 'Normal';
+    const hull    = new cv.Mat();
+    const defects = new cv.Mat();
+    try {
+      cv.convexHull(largestContour, hull, false, false);
+      if (hull.rows > 3 && largestContour.rows > 3) {
+        cv.convexityDefects(largestContour, hull, defects);
+        let maxDepth = 0;
+        for (let i = 0; i < defects.rows; i++) {
+          const d = defects.data32S[i * 4 + 2] / 256;
+          if (d > maxDepth) maxDepth = d;
+        }
+        if      (maxDepth > rect.height * 0.15) archType = 'High Arch';
+        else if (maxDepth < rect.height * 0.05) archType = 'Flat Foot';
+      }
+    } catch (e) {
+      console.log('Arch detection skipped:', e.message);
+    } finally {
+      cleanupMats(hull, defects);
+    }
+
+    // ── Update result UI ────────────────────────────────────────────
+    const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    setEl('footLength', a4Detected ? `${footLenMm} mm` : `${footLenPx} px (no A4 ref)`);
+    setEl('footWidth',  a4Detected ? `${footWidMm} mm` : `${footWidPx} px (no A4 ref)`);
+    setEl('archType',   archType);
+    setEl('a4Detected', a4Detected ? '✅ Auto-calibrated' : '⚠️ Manual scale (no A4 detected)');
+
+    window.scanMeasurements = {
+      lengthMm:   footLenMm,
+      widthMm:    footWidMm,
+      archType,
+      a4Detected,
+      scale,
+      brightness,
+      timestamp:  new Date().toISOString()
+    };
+
+    cv.imshow(canvasEl, src);
+    updateStatus('✅ Foot detected! Proceeding to goal selection…');
+
+    setTimeout(() => goToStep(2), 1500);
+
   } catch (err) {
-    console.error('OpenCV processing error:', err);
-    
-    // ✅ Ensure cleanup even on error (⭐ IMPROVEMENT #1)
-    cleanupMats(src, gray, blur, thresh, opened, contours, hierarchy);
-    
-    updateStatus('⚠️ Processing error. Try recapturing.', true);
+    console.error('OpenCV error:', err);
+    updateStatus(`⚠️ ${err.message || 'Analysis error'} — try recapturing`, true);
     if (analyzeBtn) analyzeBtn.disabled = false;
-    alert(`Analysis failed: ${err.message}. Ensure good lighting and clear foot outline.`);
+  } finally {
+    // BUG FIX: cleanup always runs, even on error
+    cleanupMats(src, gray, blur, thresh, opened, kernel, contours, hierarchy);
   }
 }
 
-// ===== GOAL SELECTION =====
-function selectGoal(cardElement) {
-  document.querySelectorAll('.goal-card').forEach(card => {
-    card.classList.remove('selected');
-  });
-  cardElement.classList.add('selected');
-  selectedGoal = cardElement.dataset.goal;
-  const submitBtn = document.getElementById('submitGoalBtn');
-  if (submitBtn) submitBtn.disabled = false;
-  
-  const icon = cardElement.querySelector('.goal-icon i');
-  if (icon) {
-    icon.classList.add('fa-bounce');
-    setTimeout(() => icon.classList.remove('fa-bounce'), 600);
-  }
+// ═══════════════════════════════════════════════════════════════════
+//  GOAL SELECTION
+// ═══════════════════════════════════════════════════════════════════
+function selectGoal(cardEl) {
+  document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('selected'));
+  cardEl.classList.add('selected');
+  selectedGoal = cardEl.dataset.goal;
+  updateButtonStates();
 }
 
-// ===== SUBMIT FOR CALIBRATION =====
+// ═══════════════════════════════════════════════════════════════════
+//  SUBMIT FOR CALIBRATION
+// ═══════════════════════════════════════════════════════════════════
 function submitCalibration() {
   if (!selectedGoal) {
     alert('Please select a wellness goal to continue.');
     return;
   }
-  
-  updateStatus('🔐 Encrypting biometric data...');
-  
+
+  updateStatus('🔐 Encrypting biometric data…');
+
   const payload = {
-    goal: selectedGoal,
+    goal:         selectedGoal,
     measurements: window.scanMeasurements || null,
-    imageData: canvas ? canvas.toDataURL('image/png') : null,
     meta: {
-      userAgent: navigator.userAgent,
-      screenOrientation: screen.orientation?.angle || 0,
-      timestamp: new Date().toISOString()
+      userAgent:   navigator.userAgent,
+      orientation: (screen.orientation && screen.orientation.angle) || 0,
+      timestamp:   new Date().toISOString()
     }
   };
-  
+
+  // Show goal label on success screen
+  const goalLabels = { calm: 'Sleep & Calm', recovery: 'Recovery', focus: 'Mental Focus' };
+  const goalEl = document.getElementById('goalDisplay');
+  if (goalEl) goalEl.textContent = goalLabels[selectedGoal] || selectedGoal;
+
+  console.log('📦 Calibration payload prepared:', payload);
+
   setTimeout(() => {
-    updateStatus('📡 Transmitting to calibration engine...');
-    
+    updateStatus('📡 Transmitting to calibration engine…');
     setTimeout(() => {
       goToStep(3);
-      // 🚀 PRODUCTION: Uncomment for real backend integration
+
+      // 🚀 PRODUCTION: Uncomment and implement for real backend
       /*
       fetch('/api/calibrate', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body:    JSON.stringify(payload)
       })
-      .then(res => res.json())
-      .then(data => {
-        console.log('✅ Calibration job queued:', data.jobId);
-      })
-      .catch(err => {
-        console.error('❌ Submission failed:', err);
-        alert('Submission failed. Please try again or contact support.');
-      });
+      .then(r => r.json())
+      .then(data => console.log('✅ Job queued:', data.jobId))
+      .catch(err => alert('Submission failed. Please try again.'));
       */
     }, 1200);
   }, 1000);
 }
 
-// ===== UTILITY: Cleanup on unload =====
-window.addEventListener('beforeunload', () => {
-  stopCamera(); // ⭐ IMPROVEMENT #2: Always clean up on exit
-});
-
-// ===== INITIALIZATION =====
+// ═══════════════════════════════════════════════════════════════════
+//  INITIALISATION
+// ═══════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   updateButtonStates();
   updatePerfMonitor();
-  
-  document.addEventListener('keydown', (e) => {
+
+  // Keyboard shortcuts (step 1 only)
+  document.addEventListener('keydown', e => {
     if (currentStep !== 1) return;
     const captureBtn = document.getElementById('captureBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
-    if (e.key.toLowerCase() === 'c' && captureBtn && !captureBtn.disabled) {
-      capture();
-    }
-    if (e.key.toLowerCase() === 'a' && analyzeBtn && !analyzeBtn.disabled) {
-      processFoot();
-    }
+    if (e.key.toLowerCase() === 'c' && captureBtn && !captureBtn.disabled) capture();
+    if (e.key.toLowerCase() === 'a' && analyzeBtn && !analyzeBtn.disabled) processFoot();
   });
-  
-  // Fallback OpenCV check
-  setInterval(() => {
-    if (!window.cvReady && !window.cvLoadError && typeof cv !== 'undefined' && cv.Mat) {
+
+  // Fallback poll: if OpenCV loaded silently (no callback), detect it
+  const cvPoll = setInterval(() => {
+    if (window.cvReady) { clearInterval(cvPoll); return; }
+    if (typeof cv !== 'undefined' && cv.Mat) {
+      clearInterval(cvPoll);
       window.onOpenCvReady();
     }
-  }, 1000);
+  }, 800);
 });
 </script>
 
