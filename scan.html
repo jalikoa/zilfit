@@ -10,6 +10,12 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
+/* San Francisco system font stack */
+*, *::before, *::after {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+               "Helvetica Neue", Arial, sans-serif !important;
+}
+
 /* ===== SPLASH SCREEN ===== */
 .splash-screen {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -41,17 +47,89 @@
   border:2px dashed #444; border-radius:25px; padding:30px;
   background:#181818; position:relative; overflow:hidden;
 }
+
+/* ===== MEDICAL LASER SCAN OVERLAY ===== */
 .laser-overlay {
-  position:absolute; top:0; left:0; width:100%; height:100%;
-  pointer-events:none; display:none; z-index:10;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; display: none; z-index: 10;
 }
+.laser-overlay.active { display: block; }
+
+/* Primary scan beam */
 .laser-line {
-  position:absolute; left:0; width:100%; height:3px;
-  background:linear-gradient(90deg,transparent,#ff006e,#0dcaf0,transparent);
-  box-shadow:0 0 15px #ff006e, 0 0 30px #0dcaf0;
-  animation:scanLine 2.5s ease-in-out infinite; border-radius:2px;
+  position: absolute; left: 0; width: 100%; height: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 210, 255, 0.15) 8%,
+    rgba(0, 210, 255, 0.85) 38%,
+    #00d2ff 50%,
+    rgba(0, 210, 255, 0.85) 62%,
+    rgba(0, 210, 255, 0.15) 92%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 3px rgba(0, 210, 255, 0.7),
+    0 0 10px rgba(0, 210, 255, 0.45),
+    0 0 22px rgba(0, 210, 255, 0.2),
+    0 0 1px #fff;
+  border-radius: 1px;
+  animation: scanLine 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
-@keyframes scanLine { 0%{top:-10%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:110%;opacity:0} }
+
+/* Trailing glow beneath scan line */
+.laser-line::after {
+  content: '';
+  position: absolute; left: 0; top: 2px;
+  width: 100%; height: 50px;
+  background: linear-gradient(180deg, rgba(0, 210, 255, 0.1) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+@keyframes scanLine {
+  0%   { top: -2px;  opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%;  opacity: 0; }
+}
+
+/* Corner brackets — medical device framing */
+.scan-corner {
+  position: absolute; width: 20px; height: 20px;
+  border-color: rgba(0, 210, 255, 0.65); border-style: solid;
+  z-index: 11; opacity: 0; transition: opacity 0.25s ease;
+}
+.laser-overlay.active .scan-corner { opacity: 1; }
+.scan-corner.tl { top: 14px;    left: 14px;    border-width: 2px 0 0 2px; }
+.scan-corner.tr { top: 14px;    right: 14px;   border-width: 2px 2px 0 0; }
+.scan-corner.bl { bottom: 14px; left: 14px;    border-width: 0 0 2px 2px; }
+.scan-corner.br { bottom: 14px; right: 14px;   border-width: 0 2px 2px 0; }
+
+/* Horizontal scan progress track at bottom */
+.scan-progress-bar {
+  position: absolute; bottom: 0; left: 0; height: 2px;
+  background: linear-gradient(90deg, #0d6efd, #0dcaf0);
+  display: none; z-index: 12;
+  animation: scanProgress 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.laser-overlay.active .scan-progress-bar { display: block; }
+@keyframes scanProgress {
+  0%   { width: 0%;    opacity: 0.5; }
+  50%  { width: 55%;   opacity: 1;   }
+  100% { width: 100%;  opacity: 0.5; }
+}
+
+/* Status readout badge */
+.scan-readout {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 210, 255, 0.3);
+  border-radius: 4px; padding: 3px 10px;
+  font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em;
+  color: rgba(0, 210, 255, 0.9); text-transform: uppercase;
+  z-index: 13; display: none;
+  animation: readoutBlink 1.1s step-end infinite;
+}
+.laser-overlay.active .scan-readout { display: block; }
+@keyframes readoutBlink { 0%,100%{opacity:1} 50%{opacity:0.35} }
 
 .scan-guide {
   position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
@@ -117,7 +195,6 @@ video, canvas {
 .goal-desc { color:#aaa; font-size:0.95rem; line-height:1.5; }
 
 /* ===== SCAN STEPS VISIBILITY ===== */
-/* BUG FIX: was using .scan-step and .d-step inconsistently */
 .scan-step { display:none; }
 .scan-step.active { display:block; animation:fadeIn 0.5s ease; }
 
@@ -256,9 +333,16 @@ video, canvas {
       <div class="row justify-content-center">
         <div class="col-lg-6 mb-5">
           <div class="scan-box">
-            <!-- Laser animation overlay shown during capture -->
+
+            <!-- Medical laser scan overlay -->
             <div class="laser-overlay" id="laserOverlay">
               <div class="laser-line"></div>
+              <div class="scan-corner tl"></div>
+              <div class="scan-corner tr"></div>
+              <div class="scan-corner bl"></div>
+              <div class="scan-corner br"></div>
+              <div class="scan-progress-bar"></div>
+              <div class="scan-readout">Biometric Scan Active</div>
             </div>
 
             <!-- Live camera feed -->
@@ -269,7 +353,7 @@ video, canvas {
             <!-- OpenCV not available notice -->
             <div class="cv-fallback-notice" id="cvFallbackNotice">
               <i class="fas fa-exclamation-triangle me-2"></i>
-              OpenCV is loading — analysis will be available shortly. Camera and capture work normally.
+              Vision engine loading — analysis will be available shortly. Camera and capture work normally.
             </div>
 
             <div class="mt-4 d-flex justify-content-center gap-2 flex-wrap">
@@ -334,7 +418,7 @@ video, canvas {
     <!-- ===================== STEP 3: SUCCESS ===================== -->
     <div class="success-section" id="successStep">
       <div class="success-icon"><i class="fas fa-check"></i></div>
-      <h3 class="success-title">Scan Successfully Processed!</h3>
+      <h3 class="success-title">Scan Successfully Processed</h3>
       <p class="success-message">
         Your biometric footprint has been securely transmitted to our engineering pipeline for parametric calibration.
       </p>
@@ -371,15 +455,16 @@ video, canvas {
       <div class="process-steps">
         <h6><i class="fas fa-microchip me-2"></i>Processing Pipeline</h6>
         <ol>
-          <li>✅ Foot contour detection (OpenCV + Otsu threshold)</li>
-          <li>✅ Region isolation &amp; noise filtering</li>
-          <li>✅ Dimensional calculation (width + length)</li>
-          <li>✅ Scale normalization using A4 reference</li>
-          <li>⏳ 3D mesh generation &amp; biomechanical modeling</li>
+          <li>Foot contour detection (OpenCV + Otsu threshold)</li>
+          <li>Adaptive edge enhancement &amp; shadow suppression</li>
+          <li>Region isolation &amp; morphological noise filtering</li>
+          <li>Dimensional calculation (width + length)</li>
+          <li>Scale normalization using A4 reference (210x297 mm)</li>
+          <li>3D mesh generation &amp; biomechanical modeling — in queue</li>
         </ol>
         <div class="pro-tip">
           <i class="fas fa-lightbulb"></i>
-          <strong>Industry Pro Tip:</strong> For highest accuracy, always scan with foot centered on a standard A4 white sheet (210×297mm). Our algorithm auto-detects the paper's 1.414 aspect ratio to calibrate pixel-to-millimeter conversion.
+          <strong>Note:</strong> For highest accuracy, always scan with foot centered on a standard A4 white sheet (210x297 mm). The algorithm auto-detects the paper's 1.414 aspect ratio to calibrate pixel-to-millimeter conversion.
         </div>
       </div>
 
@@ -457,20 +542,16 @@ video, canvas {
   <div class="perf-row"><span>OpenCV:</span><span id="cvStatus">--</span></div>
 </div>
 
-<!-- ================================================================
-     CRITICAL: Global OpenCV callbacks defined BEFORE the script tag
-     that loads opencv.js — this guarantees they exist when called.
-================================================================ -->
+<!-- OpenCV callbacks defined before script load -->
 <script>
-  window.cvReady = false;
+  window.cvReady     = false;
   window.cvLoadError = false;
-  window.cvRetried = false;
+  window.cvRetried   = false;
 
   window.onOpenCvReady = function () {
     window.cvReady = true;
-    console.log('✅ OpenCV.js loaded successfully');
-    requestAnimationFrame(() => {
-      updateStatus('🔬 OpenCV engine ready — you may analyze');
+    requestAnimationFrame(function () {
+      updateStatus('Vision engine ready — you may analyze');
       updateButtonStates();
       updatePerfMonitor();
       hideCvFallbackNotice();
@@ -480,22 +561,19 @@ video, canvas {
   window.onOpenCvError = function () {
     if (window.cvRetried) {
       window.cvLoadError = true;
-      console.error('❌ OpenCV failed to load after retry');
-      requestAnimationFrame(() => {
-        updateStatus('⚠️ OpenCV unavailable. Camera & capture still work.', true);
+      requestAnimationFrame(function () {
+        updateStatus('Vision engine unavailable. Camera and capture still work.', true);
         showCvFallbackNotice();
         updatePerfMonitor();
       });
       return;
     }
-    // Auto-retry once from alternate CDN path
     window.cvRetried = true;
-    console.warn('⚠️ OpenCV failed. Retrying...');
-    setTimeout(() => {
-      const s = document.createElement('script');
-      s.async = true;
-      s.src = 'https://docs.opencv.org/4.8.0/opencv.js';
-      s.onload = window.onOpenCvReady;
+    setTimeout(function () {
+      var s     = document.createElement('script');
+      s.async   = true;
+      s.src     = 'https://docs.opencv.org/4.8.0/opencv.js';
+      s.onload  = window.onOpenCvReady;
       s.onerror = window.onOpenCvError;
       document.body.appendChild(s);
     }, 2000);
@@ -509,122 +587,107 @@ video, canvas {
 <!-- Bootstrap JS -->
 <script src="js/bootstrap.bundle.min.js"></script>
 
-<!-- ================================================================
-     MAIN APPLICATION SCRIPT
-================================================================ -->
 <script>
 'use strict';
 
-// ─── DOM refs (resolved once, null-safe throughout) ───────────────
-const videoEl    = document.getElementById('camera');
-const canvasEl   = document.getElementById('canvas');
-const ctx        = canvasEl ? canvasEl.getContext('2d') : null;
+// ── DOM refs ──────────────────────────────────────────────────────
+var videoEl  = document.getElementById('camera');
+var canvasEl = document.getElementById('canvas');
+var ctx      = canvasEl ? canvasEl.getContext('2d') : null;
 
-// ─── Application state ────────────────────────────────────────────
-let currentStream    = null;
-let selectedGoal     = null;
-let currentStep      = 1;
-let captureReady     = false; // BUG FIX: replaced fragile dataset flag
-let cameraStarted    = false;
+// ── Application state ─────────────────────────────────────────────
+var currentStream       = null;
+var selectedGoal        = null;
+var currentStep         = 1;
+var captureReady        = false;
+var cameraStarted       = false;
+var lastProcessTime     = 0;
+var PROCESS_COOLDOWN_MS = 500;
 
-// ─── FPS limiter (only for processFoot, NOT for capture) ──────────
-let lastProcessTime  = 0;
-const PROCESS_COOLDOWN_MS = 500; // half-second between analyze calls
-
+// ── Helpers ───────────────────────────────────────────────────────
 function canProcessNow() {
-  const now = performance.now();
+  var now = performance.now();
   if (now - lastProcessTime < PROCESS_COOLDOWN_MS) return false;
   lastProcessTime = now;
   return true;
 }
 
-// ─── OpenCV Mat memory cleanup helper ─────────────────────────────
-function cleanupMats(...mats) {
-  mats.forEach(m => {
+function cleanupMats() {
+  for (var i = 0; i < arguments.length; i++) {
+    var m = arguments[i];
     if (m && !m.isDeleted && typeof m.delete === 'function') {
       try { m.delete(); } catch (_) {}
     }
-  });
+  }
 }
 
-// ─── Camera stop ──────────────────────────────────────────────────
 function stopCamera() {
   if (currentStream) {
-    currentStream.getTracks().forEach(t => t.stop());
+    currentStream.getTracks().forEach(function (t) { t.stop(); });
     currentStream = null;
     if (videoEl) videoEl.srcObject = null;
     cameraStarted = false;
   }
 }
 
-// ─── Splash screen ────────────────────────────────────────────────
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    const splash = document.getElementById('splashScreen');
+// ── Splash ────────────────────────────────────────────────────────
+window.addEventListener('load', function () {
+  setTimeout(function () {
+    var splash = document.getElementById('splashScreen');
     if (splash) splash.classList.add('hidden');
   }, 2800);
 });
 
-// ─── Cleanup on tab/window close ──────────────────────────────────
 window.addEventListener('beforeunload', stopCamera);
 
-// ─── Status display ───────────────────────────────────────────────
-function updateStatus(message, isWarning = false) {
-  const el = document.getElementById('scanStatus');
+// ── Status display ────────────────────────────────────────────────
+function updateStatus(message, isWarning) {
+  var el   = document.getElementById('scanStatus');
   if (!el) return;
-  const icon = isWarning ? 'fa-exclamation-triangle' : 'fa-circle-notch fa-spin';
-  el.innerHTML = `<i class="fas ${icon} me-1"></i>${message}`;
+  var icon = isWarning ? 'fa-exclamation-triangle' : 'fa-circle-notch fa-spin';
+  el.innerHTML   = '<i class="fas ' + icon + ' me-1"></i>' + message;
   el.style.color = isWarning ? '#ffc107' : '#aaa';
 }
 
-// ─── OpenCV fallback notice ───────────────────────────────────────
+// ── CV fallback notice ────────────────────────────────────────────
 function showCvFallbackNotice() {
-  const el = document.getElementById('cvFallbackNotice');
+  var el = document.getElementById('cvFallbackNotice');
   if (el) el.classList.add('show');
 }
 function hideCvFallbackNotice() {
-  const el = document.getElementById('cvFallbackNotice');
+  var el = document.getElementById('cvFallbackNotice');
   if (el) el.classList.remove('show');
 }
 
-// ─── Button state management ─────────────────────────────────────
-// BUG FIX: single source of truth for all button enable/disable logic
+// ── Button states ─────────────────────────────────────────────────
 function updateButtonStates() {
-  const startBtn   = document.getElementById('startCameraBtn');
-  const captureBtn = document.getElementById('captureBtn');
-  const analyzeBtn = document.getElementById('analyzeBtn');
-  const submitBtn  = document.getElementById('submitGoalBtn');
+  var startBtn   = document.getElementById('startCameraBtn');
+  var captureBtn = document.getElementById('captureBtn');
+  var analyzeBtn = document.getElementById('analyzeBtn');
+  var submitBtn  = document.getElementById('submitGoalBtn');
 
   if (startBtn)   startBtn.disabled   = cameraStarted;
-  // BUG FIX: was using readyState === 4 (HAVE_ENOUGH_DATA only)
-  // Changed to readyState >= 2 (HAVE_CURRENT_DATA+) — works on all browsers/devices
   if (captureBtn) captureBtn.disabled = !(cameraStarted && videoEl && videoEl.readyState >= 2);
-  // Analyze requires a capture AND OpenCV to be ready
   if (analyzeBtn) analyzeBtn.disabled = !(captureReady && window.cvReady);
   if (submitBtn)  submitBtn.disabled  = !selectedGoal;
 }
 
-// ─── Step navigation ──────────────────────────────────────────────
+// ── Step navigation ───────────────────────────────────────────────
 function goToStep(stepNumber) {
-  // Stop camera when leaving scan step
   if (currentStep === 1 && stepNumber !== 1) stopCamera();
-
   currentStep = stepNumber;
 
-  // Update step dots
-  [1, 2, 3].forEach(n => {
-    const dot = document.getElementById(`dot${n}`);
+  [1, 2, 3].forEach(function (n) {
+    var dot = document.getElementById('dot' + n);
     if (!dot) return;
     dot.classList.remove('active', 'completed');
-    if (n < stepNumber) dot.classList.add('completed');
+    if (n < stepNumber)   dot.classList.add('completed');
     if (n === stepNumber) dot.classList.add('active');
   });
 
-  // Show/hide panels
-  // BUG FIX: scanStep uses .scan-step, not .d-step — unified class
-  const scanStep    = document.getElementById('scanStep');
-  const goalStep    = document.getElementById('goalStep');
-  const successStep = document.getElementById('successStep');
+  var scanStep    = document.getElementById('scanStep');
+  var goalStep    = document.getElementById('goalStep');
+  var successStep = document.getElementById('successStep');
 
   if (scanStep)    scanStep.classList.toggle('active', stepNumber === 1);
   if (goalStep)    goalStep.classList.toggle('active', stepNumber === 2);
@@ -634,36 +697,36 @@ function goToStep(stepNumber) {
   updatePerfMonitor();
 }
 
-// ─── Performance monitor (debug mode only) ────────────────────────
+// ── Performance monitor ───────────────────────────────────────────
 function updatePerfMonitor() {
-  const monitor = document.getElementById('perfMonitor');
+  var monitor = document.getElementById('perfMonitor');
   if (!monitor) return;
-  const isDebug = location.hostname === 'localhost' || location.search.includes('debug');
+  var isDebug = location.hostname === 'localhost' || location.search.indexOf('debug') !== -1;
   monitor.classList.toggle('active', isDebug);
   if (!isDebug) return;
 
-  const fpsEl = document.getElementById('fpsValue');
-  if (fpsEl) fpsEl.textContent = '≤10 (throttled)';
+  var fpsEl = document.getElementById('fpsValue');
+  if (fpsEl) fpsEl.textContent = 'throttled';
 
-  const memEl = document.getElementById('memValue');
+  var memEl = document.getElementById('memValue');
   if (memEl && performance.memory) {
     memEl.textContent = Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB';
   } else if (memEl) {
     memEl.textContent = 'N/A';
   }
 
-  const cvEl = document.getElementById('cvStatus');
+  var cvEl = document.getElementById('cvStatus');
   if (cvEl) {
-    cvEl.textContent  = window.cvReady ? '✅ Ready' : (window.cvLoadError ? '❌ Error' : '⏳ Loading');
-    cvEl.style.color  = window.cvReady ? '#0f0'    : (window.cvLoadError ? '#f00'     : '#ff0');
+    cvEl.textContent = window.cvReady ? 'Ready' : (window.cvLoadError ? 'Error' : 'Loading');
+    cvEl.style.color = window.cvReady ? '#0f0'  : (window.cvLoadError ? '#f00'  : '#ff0');
   }
 }
 
-// ─── Reset everything for a new scan ─────────────────────────────
+// ── Reset ─────────────────────────────────────────────────────────
 function resetAll() {
-  captureReady  = false;
-  selectedGoal  = null;
-  cameraStarted = false;
+  captureReady            = false;
+  selectedGoal            = null;
+  cameraStarted           = false;
   window.scanMeasurements = null;
 
   if (canvasEl) {
@@ -672,91 +735,84 @@ function resetAll() {
   }
   if (videoEl) videoEl.style.display = 'block';
 
-  document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.goal-card').forEach(function (c) {
+    c.classList.remove('selected');
+  });
 
   goToStep(1);
   updateStatus('Click "Start Camera" to begin');
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  CAMERA
-// ═══════════════════════════════════════════════════════════════════
+// ── Laser scan effect ─────────────────────────────────────────────
+function showLaserScan(durationMs) {
+  var overlay = document.getElementById('laserOverlay');
+  if (!overlay) return;
+  overlay.classList.add('active');
+  setTimeout(function () {
+    overlay.classList.remove('active');
+  }, durationMs || 3200);
+}
+
+// ── Camera ────────────────────────────────────────────────────────
 async function startCamera() {
   if (cameraStarted) return;
   updateStatus('Requesting camera access...');
-  const startBtn = document.getElementById('startCameraBtn');
+  var startBtn = document.getElementById('startCameraBtn');
   if (startBtn) startBtn.disabled = true;
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width:  { ideal: 1280 },
-        height: { ideal: 720 },
-        facingMode: 'environment'
-      },
+    var stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' },
       audio: false
     });
 
     currentStream = stream;
     if (videoEl) {
-      videoEl.srcObject = stream;
+      videoEl.srcObject     = stream;
       videoEl.style.display = 'block';
     }
 
-    // BUG FIX: Use 'loadeddata' event (fires at readyState >= 2) 
-    // instead of 'loadedmetadata' (which fires before frames are available)
-    videoEl.addEventListener('loadeddata', () => {
+    videoEl.addEventListener('loadeddata', function () {
       cameraStarted = true;
-      updateStatus('📷 Camera active — position your foot in frame');
+      updateStatus('Camera active — position your foot in frame');
       updateButtonStates();
     }, { once: true });
 
-    // Fallback: if loadeddata never fires, check on play
-    videoEl.addEventListener('playing', () => {
+    videoEl.addEventListener('playing', function () {
       if (!cameraStarted) {
         cameraStarted = true;
-        updateStatus('📷 Camera active — position your foot in frame');
+        updateStatus('Camera active — position your foot in frame');
         updateButtonStates();
       }
     }, { once: true });
 
-    await videoEl.play().catch(e => console.warn('Autoplay warning (safe to ignore):', e));
+    await videoEl.play().catch(function (e) { console.warn('Autoplay:', e); });
 
   } catch (err) {
-    console.error('Camera error:', err);
-    const msg =
-      err.name === 'NotAllowedError'  ? 'Camera permission was denied' :
-      err.name === 'NotFoundError'    ? 'No camera detected on this device' :
-      err.name === 'NotReadableError' ? 'Camera is in use by another app' :
-      err.message;
-
-    updateStatus(`❌ ${msg}`, true);
+    var msg = err.name === 'NotAllowedError'  ? 'Camera permission was denied'      :
+              err.name === 'NotFoundError'    ? 'No camera detected on this device' :
+              err.name === 'NotReadableError' ? 'Camera is in use by another app'   :
+              err.message;
+    updateStatus(msg, true);
     if (startBtn) startBtn.disabled = false;
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  CAPTURE
-// ═══════════════════════════════════════════════════════════════════
+// ── Capture ───────────────────────────────────────────────────────
 function capture() {
-  // BUG FIX: use >= 2 not !== 4 — covers all browsers & devices
   if (!videoEl || videoEl.readyState < 2) {
-    updateStatus('⚠️ Video not ready yet — wait a moment', true);
+    updateStatus('Video not ready — wait a moment', true);
     return;
   }
 
-  // BUG FIX: removed FPS limiter from capture — it was silently blocking
-  // legitimate captures. FPS limiting is only appropriate for heavy CV processing.
-
-  const w = videoEl.videoWidth;
-  const h = videoEl.videoHeight;
+  var w = videoEl.videoWidth;
+  var h = videoEl.videoHeight;
   if (!w || !h) {
-    updateStatus('⚠️ Unable to read video dimensions', true);
+    updateStatus('Unable to read video dimensions', true);
     return;
   }
 
-  // Handle device rotation
-  const angle = (screen.orientation && screen.orientation.angle) || 0;
+  var angle = (screen.orientation && screen.orientation.angle) || 0;
   if (angle === 90 || angle === 270) {
     canvasEl.width  = h;
     canvasEl.height = w;
@@ -771,233 +827,262 @@ function capture() {
     ctx.drawImage(videoEl, 0, 0, w, h);
   }
 
-  // Show canvas, hide live video
   canvasEl.style.display = 'block';
-  captureReady = true; // BUG FIX: was using fragile dataset.captured string
+  captureReady = true;
 
-  // Laser animation
-  const laser = document.getElementById('laserOverlay');
-  if (laser) {
-    laser.style.display = 'block';
-    setTimeout(() => { laser.style.display = 'none'; }, 3000);
-  }
+  showLaserScan(3200);
 
-  updateStatus('✅ Capture complete! Click "Analyze" to process.');
+  updateStatus('Capture complete. Click "Analyze" to process.');
   updateButtonStates();
 }
 
-// Wire capture button properly (no inline onclick that could fire before DOM ready)
-document.addEventListener('DOMContentLoaded', () => {
-  const captureBtn = document.getElementById('captureBtn');
+// ── Wire buttons on DOM ready ─────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+  var captureBtn = document.getElementById('captureBtn');
   if (captureBtn) captureBtn.addEventListener('click', capture);
-  const analyzeBtn = document.getElementById('analyzeBtn');
+  var analyzeBtn = document.getElementById('analyzeBtn');
   if (analyzeBtn) analyzeBtn.addEventListener('click', processFoot);
+
+  updateButtonStates();
+  updatePerfMonitor();
+
+  document.addEventListener('keydown', function (e) {
+    if (currentStep !== 1) return;
+    var cb = document.getElementById('captureBtn');
+    var ab = document.getElementById('analyzeBtn');
+    if (e.key.toLowerCase() === 'c' && cb && !cb.disabled) capture();
+    if (e.key.toLowerCase() === 'a' && ab && !ab.disabled) processFoot();
+  });
+
+  var cvPoll = setInterval(function () {
+    if (window.cvReady) { clearInterval(cvPoll); return; }
+    if (typeof cv !== 'undefined' && cv.Mat) {
+      clearInterval(cvPoll);
+      window.onOpenCvReady();
+    }
+  }, 800);
 });
 
-// ═══════════════════════════════════════════════════════════════════
-//  OPENCV PROCESSING PIPELINE
-// ═══════════════════════════════════════════════════════════════════
+// ── OpenCV pipeline ───────────────────────────────────────────────
 function processFoot() {
   if (!window.cvReady) {
-    updateStatus('⏳ OpenCV is still initializing — try again in a moment', true);
+    updateStatus('Vision engine still initializing — try again in a moment', true);
     return;
   }
   if (!captureReady) {
-    updateStatus('⚠️ Please capture an image first', true);
+    updateStatus('Please capture an image first', true);
     return;
   }
-  // BUG FIX: cooldown only on processFoot, not on capture
   if (!canProcessNow()) {
-    updateStatus('⏳ Analysis throttled — please wait', true);
+    updateStatus('Analysis in progress — please wait', true);
     return;
   }
 
-  updateStatus('🔬 Running biometric analysis pipeline...');
-  const analyzeBtn = document.getElementById('analyzeBtn');
+  updateStatus('Running biometric analysis...');
+  var analyzeBtn = document.getElementById('analyzeBtn');
   if (analyzeBtn) analyzeBtn.disabled = true;
 
-  // Run in a microtask so the status text renders before the heavy work
-  setTimeout(() => _runOpenCV(analyzeBtn), 50);
+  setTimeout(function () { _runOpenCV(analyzeBtn); }, 50);
 }
 
 function _runOpenCV(analyzeBtn) {
-  // Declare all Mats up-front for guaranteed cleanup in finally block
-  let src = null, gray = null, blur = null, thresh = null,
-      opened = null, kernel = null, contours = null, hierarchy = null;
+  var src      = null, gray   = null, blur  = null, thresh = null,
+      opened   = null, kernel = null, contours = null, hierarchy = null,
+      enh      = null, lap    = null;
 
   try {
     src = cv.imread(canvasEl);
     if (src.empty()) throw new Error('Captured frame is empty — please retake');
 
-    // ── Resize for performance (max 640px on longest side) ──────────
-    const MAX = 640;
+    // Resize for performance
+    var MAX = 720;
     if (src.cols > MAX || src.rows > MAX) {
-      const scale   = MAX / Math.max(src.cols, src.rows);
-      const newSize = new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale));
+      var sc      = MAX / Math.max(src.cols, src.rows);
+      var newSize = new cv.Size(Math.round(src.cols * sc), Math.round(src.rows * sc));
       cv.resize(src, src, newSize, 0, 0, cv.INTER_LINEAR);
     }
 
     gray = new cv.Mat();
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-    // ── Lighting validation ──────────────────────────────────────────
-    const brightness = cv.mean(gray)[0];
-    if (brightness < 40) {
-      updateStatus('⚠️ Image too dark — please add more light', true);
+    // Lighting validation
+    var brightness = cv.mean(gray)[0];
+    if (brightness < 35) {
+      updateStatus('Image too dark — please add more light', true);
       if (analyzeBtn) analyzeBtn.disabled = false;
       cleanupMats(src, gray);
       return;
     }
-    if (brightness > 225) {
-      updateStatus('⚠️ Image overexposed — reduce lighting', true);
+    if (brightness > 230) {
+      updateStatus('Image overexposed — reduce lighting', true);
       if (analyzeBtn) analyzeBtn.disabled = false;
       cleanupMats(src, gray);
       return;
     }
 
-    // ── Gaussian blur → Otsu threshold ──────────────────────────────
-    blur   = new cv.Mat();
+    // Contrast normalization
+    enh = new cv.Mat();
+    cv.equalizeHist(gray, enh);
+
+    // Gaussian blur
+    blur = new cv.Mat();
+    cv.GaussianBlur(enh, blur, new cv.Size(7, 7), 0);
+
+    // Laplacian edge sharpening
+    lap = new cv.Mat();
+    var sharpen = new cv.Mat();
+    cv.Laplacian(blur, lap, cv.CV_32F, 3);
+    cv.convertScaleAbs(lap, sharpen);
+    cv.addWeighted(blur, 1.5, sharpen, -0.5, 0, blur);
+    sharpen.delete();
+
+    // Otsu threshold
     thresh = new cv.Mat();
-    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
     cv.threshold(blur, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
 
-    // ── Morphological opening (remove noise) ────────────────────────
-    kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+    // Morphological close then open
+    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(7, 7));
     opened = new cv.Mat();
-    cv.morphologyEx(thresh, opened, cv.MORPH_OPEN, kernel);
+    cv.morphologyEx(thresh, opened, cv.MORPH_CLOSE, kernel);
+    cv.morphologyEx(opened, opened, cv.MORPH_OPEN, kernel);
 
-    // ── Contour detection ───────────────────────────────────────────
+    // Contour detection
     contours  = new cv.MatVector();
     hierarchy = new cv.Mat();
     cv.findContours(opened, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-    const imageArea = src.rows * src.cols;
-    let largestContour = null, maxArea = 0, a4Contour = null;
-    const A4_RATIO = 1.414;
+    var imageArea      = src.rows * src.cols;
+    var largestContour = null;
+    var maxArea        = 0;
+    var largestIdx     = 0;
+    var a4Contour      = null;
+    var A4_RATIO       = 1.414;
 
-    for (let i = 0; i < contours.size(); i++) {
-      const cnt  = contours.get(i);
-      const area = cv.contourArea(cnt);
-      if (area > maxArea) { maxArea = area; largestContour = cnt; }
+    for (var i = 0; i < contours.size(); i++) {
+      var cnt  = contours.get(i);
+      var area = cv.contourArea(cnt);
 
-      // A4 detection: check aspect ratio AND area > 20% of image
-      const r     = cv.boundingRect(cnt);
-      const sides = [r.width, r.height];
-      const ratio = Math.max(...sides) / Math.min(...sides);
-      if (Math.abs(ratio - A4_RATIO) < 0.15 && area > imageArea * 0.2 && area > 10000) {
+      // Solidity filter — rejects jagged noise and shadows
+      var hullSolidity = new cv.Mat();
+      cv.convexHull(cnt, hullSolidity, false, true);
+      var hullArea = cv.contourArea(hullSolidity);
+      hullSolidity.delete();
+      var solidity = hullArea > 0 ? area / hullArea : 0;
+
+      if (area > maxArea && solidity > 0.3) {
+        maxArea        = area;
+        largestContour = cnt;
+        largestIdx     = i;
+      }
+
+      // A4 detection
+      var r     = cv.boundingRect(cnt);
+      var sides = [r.width, r.height];
+      var ratio = Math.max.apply(null, sides) / Math.min.apply(null, sides);
+      if (Math.abs(ratio - A4_RATIO) < 0.14 && area > imageArea * 0.18 && area > 8000) {
         a4Contour = cnt;
       }
     }
 
-    if (!largestContour || maxArea < 4000) {
-      updateStatus('⚠️ No foot detected — ensure good contrast & lighting', true);
+    if (!largestContour || maxArea < 3500) {
+      updateStatus('No foot detected — ensure good contrast and lighting', true);
       if (analyzeBtn) analyzeBtn.disabled = false;
-      cleanupMats(src, gray, blur, thresh, opened, kernel, contours, hierarchy);
+      cleanupMats(src, gray, blur, thresh, opened, kernel, contours, hierarchy, enh, lap);
       return;
     }
 
-    // ── Draw contour on source image ─────────────────────────────────
-    // BUG FIX: old code searched for === identity match which is unreliable;
-    // now we track the index directly during the loop above
-    let largestIdx = 0;
-    for (let i = 0; i < contours.size(); i++) {
-      if (cv.contourArea(contours.get(i)) === maxArea) { largestIdx = i; break; }
-    }
-    cv.drawContours(src, contours, largestIdx, new cv.Scalar(0, 255, 100, 255), 3);
+    // Draw detected contour
+    cv.drawContours(src, contours, largestIdx, new cv.Scalar(0, 212, 170, 255), 3);
 
-    // ── Measurements ────────────────────────────────────────────────
-    const rect        = cv.boundingRect(largestContour);
-    const footLenPx   = rect.height;
-    const footWidPx   = rect.width;
+    // Measurements
+    var rect       = cv.boundingRect(largestContour);
+    var scale      = 1.0;
+    var a4Detected = false;
 
-    let scale       = 1.0;
-    let a4Detected  = false;
     if (a4Contour) {
-      const a4r    = cv.boundingRect(a4Contour);
-      const a4Long = Math.max(a4r.width, a4r.height);
-      scale        = 297 / a4Long; // A4 long side = 297 mm
-      a4Detected   = true;
+      var a4r    = cv.boundingRect(a4Contour);
+      var a4Long = Math.max(a4r.width, a4r.height);
+      scale      = 297 / a4Long;
+      a4Detected = true;
     }
 
-    const footLenMm = Math.round(footLenPx * scale);
-    const footWidMm = Math.round(footWidPx * scale);
+    var footLenMm = Math.round(rect.height * scale);
+    var footWidMm = Math.round(rect.width  * scale);
 
-    // ── Arch type via convexity defects ─────────────────────────────
-    let archType = 'Normal';
-    const hull    = new cv.Mat();
-    const defects = new cv.Mat();
+    // Arch detection via convexity defects
+    var archType = 'Normal';
+    var hull2    = new cv.Mat();
+    var defects  = new cv.Mat();
     try {
-      cv.convexHull(largestContour, hull, false, false);
-      if (hull.rows > 3 && largestContour.rows > 3) {
-        cv.convexityDefects(largestContour, hull, defects);
-        let maxDepth = 0;
-        for (let i = 0; i < defects.rows; i++) {
-          const d = defects.data32S[i * 4 + 2] / 256;
+      cv.convexHull(largestContour, hull2, false, false);
+      if (hull2.rows > 3 && largestContour.rows > 3) {
+        cv.convexityDefects(largestContour, hull2, defects);
+        var maxDepth = 0;
+        for (var j = 0; j < defects.rows; j++) {
+          var d = defects.data32S[j * 4 + 2] / 256;
           if (d > maxDepth) maxDepth = d;
         }
-        if      (maxDepth > rect.height * 0.15) archType = 'High Arch';
+        if      (maxDepth > rect.height * 0.14) archType = 'High Arch';
         else if (maxDepth < rect.height * 0.05) archType = 'Flat Foot';
       }
-    } catch (e) {
-      console.log('Arch detection skipped:', e.message);
+    } catch (archErr) {
+      // Arch detection skipped
     } finally {
-      cleanupMats(hull, defects);
+      cleanupMats(hull2, defects);
     }
 
-    // ── Update result UI ────────────────────────────────────────────
-    const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-    setEl('footLength', a4Detected ? `${footLenMm} mm` : `${footLenPx} px (no A4 ref)`);
-    setEl('footWidth',  a4Detected ? `${footWidMm} mm` : `${footWidPx} px (no A4 ref)`);
+    // Update result fields
+    function setEl(id, val) {
+      var e = document.getElementById(id);
+      if (e) e.textContent = val;
+    }
+    setEl('footLength', a4Detected ? footLenMm + ' mm' : rect.height + ' px (no A4 ref)');
+    setEl('footWidth',  a4Detected ? footWidMm + ' mm' : rect.width  + ' px (no A4 ref)');
     setEl('archType',   archType);
-    setEl('a4Detected', a4Detected ? '✅ Auto-calibrated' : '⚠️ Manual scale (no A4 detected)');
+    setEl('a4Detected', a4Detected ? 'Auto-calibrated' : 'Manual scale (no A4 detected)');
 
     window.scanMeasurements = {
       lengthMm:   footLenMm,
       widthMm:    footWidMm,
-      archType,
-      a4Detected,
-      scale,
-      brightness,
+      archType:   archType,
+      a4Detected: a4Detected,
+      scale:      scale,
+      brightness: brightness,
       timestamp:  new Date().toISOString()
     };
 
     cv.imshow(canvasEl, src);
-    updateStatus('✅ Foot detected! Proceeding to goal selection…');
-
-    setTimeout(() => goToStep(2), 1500);
+    updateStatus('Foot detected. Proceeding to goal selection...');
+    setTimeout(function () { goToStep(2); }, 1500);
 
   } catch (err) {
-    console.error('OpenCV error:', err);
-    updateStatus(`⚠️ ${err.message || 'Analysis error'} — try recapturing`, true);
+    updateStatus((err.message || 'Analysis error') + ' — try recapturing', true);
     if (analyzeBtn) analyzeBtn.disabled = false;
   } finally {
-    // BUG FIX: cleanup always runs, even on error
-    cleanupMats(src, gray, blur, thresh, opened, kernel, contours, hierarchy);
+    cleanupMats(src, gray, blur, thresh, opened, kernel, contours, hierarchy, enh, lap);
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  GOAL SELECTION
-// ═══════════════════════════════════════════════════════════════════
+// ── Goal selection ────────────────────────────────────────────────
 function selectGoal(cardEl) {
-  document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.goal-card').forEach(function (c) {
+    c.classList.remove('selected');
+  });
   cardEl.classList.add('selected');
   selectedGoal = cardEl.dataset.goal;
   updateButtonStates();
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  SUBMIT FOR CALIBRATION
-// ═══════════════════════════════════════════════════════════════════
+// ── Submit calibration ────────────────────────────────────────────
 function submitCalibration() {
   if (!selectedGoal) {
     alert('Please select a wellness goal to continue.');
     return;
   }
 
-  updateStatus('🔐 Encrypting biometric data…');
+  updateStatus('Transmitting to calibration engine...');
 
-  const payload = {
+  var payload = {
     goal:         selectedGoal,
     measurements: window.scanMeasurements || null,
     meta: {
@@ -1007,58 +1092,30 @@ function submitCalibration() {
     }
   };
 
-  // Show goal label on success screen
-  const goalLabels = { calm: 'Sleep & Calm', recovery: 'Recovery', focus: 'Mental Focus' };
-  const goalEl = document.getElementById('goalDisplay');
+  var goalLabels = { calm: 'Sleep & Calm', recovery: 'Recovery', focus: 'Mental Focus' };
+  var goalEl     = document.getElementById('goalDisplay');
   if (goalEl) goalEl.textContent = goalLabels[selectedGoal] || selectedGoal;
 
-  console.log('📦 Calibration payload prepared:', payload);
+  console.log('Calibration payload:', payload);
 
-  setTimeout(() => {
-    updateStatus('📡 Transmitting to calibration engine…');
-    setTimeout(() => {
+  setTimeout(function () {
+    setTimeout(function () {
       goToStep(3);
 
-      // 🚀 PRODUCTION: Uncomment and implement for real backend
+      // Production: wire to real backend
       /*
       fetch('/api/calibrate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload)
       })
-      .then(r => r.json())
-      .then(data => console.log('✅ Job queued:', data.jobId))
-      .catch(err => alert('Submission failed. Please try again.'));
+      .then(function (r) { return r.json(); })
+      .then(function (data) { console.log('Job queued:', data.jobId); })
+      .catch(function () { alert('Submission failed. Please try again.'); });
       */
     }, 1200);
   }, 1000);
 }
-
-// ═══════════════════════════════════════════════════════════════════
-//  INITIALISATION
-// ═══════════════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  updateButtonStates();
-  updatePerfMonitor();
-
-  // Keyboard shortcuts (step 1 only)
-  document.addEventListener('keydown', e => {
-    if (currentStep !== 1) return;
-    const captureBtn = document.getElementById('captureBtn');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    if (e.key.toLowerCase() === 'c' && captureBtn && !captureBtn.disabled) capture();
-    if (e.key.toLowerCase() === 'a' && analyzeBtn && !analyzeBtn.disabled) processFoot();
-  });
-
-  // Fallback poll: if OpenCV loaded silently (no callback), detect it
-  const cvPoll = setInterval(() => {
-    if (window.cvReady) { clearInterval(cvPoll); return; }
-    if (typeof cv !== 'undefined' && cv.Mat) {
-      clearInterval(cvPoll);
-      window.onOpenCvReady();
-    }
-  }, 800);
-});
 </script>
 
 </body>
